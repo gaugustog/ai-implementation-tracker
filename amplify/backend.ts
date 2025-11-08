@@ -64,21 +64,14 @@ const gitIntegrationFunctionUrl = backend.gitIntegration.resources.lambda.addFun
 });
 
 // Grant permissions to Git Integration function
-backend.gitIntegration.resources.lambda.addEnvironment('TABLE_NAME', backend.data.resources.tables['GitRepository'].tableName);
-backend.gitIntegration.resources.lambda.addEnvironment('BUCKET_NAME', backend.storage.resources.bucket.bucketName);
-
 const gitIntegrationPolicy = new Policy(
   backend.gitIntegration.resources.lambda,
   'GitIntegrationPolicy',
   {
     statements: [
       new PolicyStatement({
-        actions: ['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:UpdateItem', 'dynamodb:Query'],
-        resources: [
-          backend.data.resources.tables['GitRepository'].tableArn,
-          backend.data.resources.tables['CodeSnapshot'].tableArn,
-          backend.data.resources.tables['ProjectContext'].tableArn,
-        ],
+        actions: ['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:UpdateItem', 'dynamodb:Query', 'dynamodb:Scan'],
+        resources: ['*'], // In production, specify exact table ARNs
       }),
       new PolicyStatement({
         actions: ['s3:PutObject', 's3:GetObject'],
@@ -105,21 +98,14 @@ const codeAnalyzerFunctionUrl = backend.codeAnalyzer.resources.lambda.addFunctio
 });
 
 // Grant permissions to Code Analyzer function
-backend.codeAnalyzer.resources.lambda.addEnvironment('TABLE_NAME', backend.data.resources.tables['GitRepository'].tableName);
-backend.codeAnalyzer.resources.lambda.addEnvironment('BUCKET_NAME', backend.storage.resources.bucket.bucketName);
-
 const codeAnalyzerPolicy = new Policy(
   backend.codeAnalyzer.resources.lambda,
   'CodeAnalyzerPolicy',
   {
     statements: [
       new PolicyStatement({
-        actions: ['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:UpdateItem'],
-        resources: [
-          backend.data.resources.tables['CodeSnapshot'].tableArn,
-          backend.data.resources.tables['ProjectContext'].tableArn,
-          backend.data.resources.tables['GitRepository'].tableArn,
-        ],
+        actions: ['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:UpdateItem', 'dynamodb:Query', 'dynamodb:Scan'],
+        resources: ['*'], // In production, specify exact table ARNs
       }),
       new PolicyStatement({
         actions: ['s3:GetObject', 's3:PutObject'],

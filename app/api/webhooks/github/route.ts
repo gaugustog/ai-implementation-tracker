@@ -77,9 +77,11 @@ export async function OPTIONS() {
  * Handle push events - trigger repository sync
  */
 async function handlePushEvent(payload: Record<string, unknown>) {
-  const repoFullName = payload.repository?.full_name;
-  const branch = payload.ref?.replace('refs/heads/', '');
-  const commitSha = payload.after;
+  const repository = payload.repository as { full_name?: string } | undefined;
+  const repoFullName = repository?.full_name;
+  const ref = payload.ref as string | undefined;
+  const branch = ref?.replace('refs/heads/', '');
+  const commitSha = payload.after as string | undefined;
 
   console.log('Push event:', { repoFullName, branch, commitSha });
 
@@ -106,9 +108,11 @@ async function handlePushEvent(payload: Record<string, unknown>) {
  * Handle pull request events
  */
 async function handlePullRequestEvent(payload: Record<string, unknown>) {
-  const action = payload.action;
-  const prNumber = payload.pull_request?.number;
-  const repoFullName = payload.repository?.full_name;
+  const action = payload.action as string | undefined;
+  const pullRequest = payload.pull_request as { number?: number } | undefined;
+  const prNumber = pullRequest?.number;
+  const repository = payload.repository as { full_name?: string } | undefined;
+  const repoFullName = repository?.full_name;
 
   console.log('Pull request event:', { action, prNumber, repoFullName });
 

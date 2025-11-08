@@ -220,7 +220,7 @@ export function CodebaseContextViewer({ context, lastAnalyzedAt }: CodebaseConte
             </AccordionSummary>
             <AccordionDetails>
               <Grid container spacing={2}>
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                   <Box>
                     <Typography variant="subtitle2" color="text.secondary">
                       Total Files
@@ -231,7 +231,7 @@ export function CodebaseContextViewer({ context, lastAnalyzedAt }: CodebaseConte
 
                 {context.metrics.languageBreakdown &&
                   Object.keys(context.metrics.languageBreakdown).length > 0 && (
-                    <Grid item xs={12}>
+                    <Grid size={{ xs: 12 }}>
                       <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                         Language Breakdown
                       </Typography>

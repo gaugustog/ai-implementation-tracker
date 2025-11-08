@@ -10,6 +10,8 @@ A Next.js dashboard application for managing spec-driven development projects wi
 - 📁 **Project Management**: Create and manage development projects
 - 📝 **Specification Management**: Organize specs by type (ANALYSIS, FIXES, PLANS, REVIEWS)
 - 🎫 **Ticket System**: Break down specifications into actionable tickets
+- 🤖 **AI-Powered Specifications**: Interactive specification builder with Amazon Bedrock
+- 🔗 **Git Integration**: Connect GitHub repositories for context-aware AI assistance
 - ☁️ **AWS Amplify Gen2**: Backend powered by AppSync and S3 storage
 - 📄 **Markdown Files**: Store specifications and tickets as .md files in S3
 
@@ -81,11 +83,22 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 ├── amplify/                 # AWS Amplify Gen2 backend
 │   ├── backend.ts          # Backend configuration
 │   ├── data/               # AppSync data schema
-│   └── storage/            # S3 storage configuration
+│   ├── storage/            # S3 storage configuration
+│   └── functions/          # Lambda functions
+│       ├── specification-conversation/  # Bedrock AI integration
+│       ├── git-integration/            # Git repository operations
+│       └── code-analyzer/              # Codebase analysis
 ├── components/
 │   ├── layout/              # Layout components
 │   │   ├── Header.tsx       # Top navigation bar
 │   │   └── Sidebar.tsx      # Side navigation menu
+│   ├── git/                 # Git integration components
+│   │   ├── GitIntegrationPanel.tsx    # Repository connection UI
+│   │   └── CodebaseContextViewer.tsx  # Analysis results viewer
+│   ├── specification/       # Specification components
+│   │   ├── SpecificationBuilder.tsx   # Main builder with AI chat
+│   │   ├── SpecificationChat.tsx      # Chat interface
+│   │   └── MarkdownEditor.tsx         # Editor with preview
 │   ├── AmplifyProvider.tsx  # Amplify context provider
 │   └── ThemeRegistry.tsx    # Material UI theme provider
 ├── lib/
@@ -128,10 +141,14 @@ Without AWS backend deployment, the app will show placeholder messages. Deploy t
 
 The application uses AWS Amplify Gen2 with:
 - **AppSync**: GraphQL API for managing projects, specifications, and tickets
-- **S3**: Storage for markdown files
+- **S3**: Storage for markdown files and codebase snapshots
+- **Lambda**: Serverless functions for AI chat and Git integration
 - **API Key**: Public access without authentication
+- **Bedrock**: Amazon Bedrock with Claude for AI-powered specifications
 
 See [AMPLIFY_SETUP.md](./AMPLIFY_SETUP.md) for detailed setup instructions.
+See [BEDROCK_INTEGRATION.md](./BEDROCK_INTEGRATION.md) for Bedrock integration details.
+See [GIT_INTEGRATION.md](./GIT_INTEGRATION.md) for Git integration guide.
 
 ## Development
 
