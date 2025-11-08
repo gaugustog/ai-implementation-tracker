@@ -8,8 +8,49 @@ export interface Ticket {
   specType?: SpecType | null;
   fileKey?: string | null; // S3 file key for markdown file
   specificationId?: string | null;
+  // Extended fields for AI-generated tickets
+  acceptanceCriteria?: string[] | null;
+  estimatedHours?: number | null;
+  complexity?: 'simple' | 'medium' | 'complex' | null;
+  dependencies?: string[] | null;
+  parallelizable?: boolean | null;
+  aiAgentCapable?: boolean | null;
+  requiredExpertise?: string[] | null;
+  testingStrategy?: string | null;
+  rollbackPlan?: string | null;
+  ticketGenerationId?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
+}
+
+export interface GeneratedTicket {
+  title: string;
+  description: string;
+  acceptanceCriteria: string[];
+  estimatedHours: number;
+  complexity: 'simple' | 'medium' | 'complex';
+  dependencies: string[];
+  parallelizable: boolean;
+  aiAgentCapable: boolean;
+  requiredExpertise: string[];
+  testingStrategy: string;
+  rollbackPlan: string;
+}
+
+export interface TicketGeneration {
+  id: string;
+  specificationId: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  summaryFileKey?: string | null;
+  executionPlanFileKey?: string | null;
+  intermediateResults?: any | null;
+  errorMessage?: string | null;
+  tokensUsed?: number | null;
+  totalCost?: number | null;
+  generatedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  tickets?: Ticket[];
 }
 
 export interface Specification {

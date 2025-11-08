@@ -7,6 +7,7 @@ import { storage } from './storage/resource';
 import { specificationConversation } from './functions/specification-conversation/resource';
 import { gitIntegration } from './functions/git-integration/resource';
 import { codeAnalyzer } from './functions/code-analyzer/resource';
+import { ticketGeneration } from './functions/ticket-generation/resource';
 
 /**
  * @see https://docs.amplify.aws/react/build-a-backend/ to add storage, functions, and more
@@ -18,6 +19,7 @@ const backend = defineBackend({
   specificationConversation,
   gitIntegration,
   codeAnalyzer,
+  ticketGeneration,
 });
 
 // Grant Bedrock permissions to the conversation function
@@ -122,5 +124,48 @@ backend.addOutput({
   custom: {
     gitIntegrationUrl: gitIntegrationFunctionUrl.url,
     codeAnalyzerUrl: codeAnalyzerFunctionUrl.url,
+  },
+});
+
+// Configure Ticket Generation function
+const ticketGenerationFunctionUrl = backend.ticketGeneration.resources.lambda.addFunctionUrl({
+  authType: FunctionUrlAuthType.NONE,
+  cors: {
+    allowedOrigins: ['*'],
+    allowedMethods: [HttpMethod.POST, HttpMethod.OPTIONS],
+    allowedHeaders: ['Content-Type'],
+  },
+});
+
+// Grant permissions to Ticket Generation function
+const ticketGenerationPolicy = new Policy(
+  backend.ticketGeneration.resources.lambda,
+  'TicketGenerationPolicy',
+  {
+    statements: [
+      new PolicyStatement({
+        actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
+        resources: ['*'],
+      }),
+      new PolicyStatement({
+        actions: ['s3:PutObject', 's3:GetObject'],
+        resources: [`${backend.storage.resources.bucket.bucketArn}/*`],
+      }),
+    ],
+  }
+);
+
+backend.ticketGeneration.resources.lambda.role?.attachInlinePolicy(ticketGenerationPolicy);
+
+// Add environment variables to ticket generation function
+backend.ticketGeneration.resources.lambda.addEnvironment(
+  'STORAGE_BUCKET_NAME',
+  backend.storage.resources.bucket.bucketName
+);
+
+// Add ticket generation URL to outputs
+backend.addOutput({
+  custom: {
+    ticketGenerationUrl: ticketGenerationFunctionUrl.url,
   },
 });

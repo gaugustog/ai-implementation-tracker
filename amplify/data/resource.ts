@@ -34,6 +34,18 @@ const schema = a.schema({
       fileKey: a.string(), // S3 file key for markdown file
       specificationId: a.id(),
       specification: a.belongsTo('Specification', 'specificationId'),
+      // Extended fields for AI-generated tickets
+      acceptanceCriteria: a.json(), // Array of acceptance criteria strings
+      estimatedHours: a.float(),
+      complexity: a.enum(['simple', 'medium', 'complex']),
+      dependencies: a.json(), // Array of ticket IDs this ticket depends on
+      parallelizable: a.boolean(),
+      aiAgentCapable: a.boolean(),
+      requiredExpertise: a.json(), // Array of required expertise strings
+      testingStrategy: a.string(),
+      rollbackPlan: a.string(),
+      ticketGenerationId: a.id(), // Reference to the generation batch
+      ticketGeneration: a.belongsTo('TicketGeneration', 'ticketGenerationId'),
       createdAt: a.datetime(),
       updatedAt: a.datetime(),
     })
@@ -95,6 +107,24 @@ const schema = a.schema({
       patterns: a.json(), // Naming conventions, architecture patterns
       integrationPoints: a.json(), // Key files and their purposes
       lastAnalyzedAt: a.datetime(),
+      createdAt: a.datetime(),
+      updatedAt: a.datetime(),
+    })
+    .authorization((allow) => [allow.publicApiKey()]),
+
+  TicketGeneration: a
+    .model({
+      specificationId: a.id().required(),
+      specification: a.belongsTo('Specification', 'specificationId'),
+      status: a.enum(['pending', 'processing', 'completed', 'failed']),
+      tickets: a.hasMany('Ticket', 'ticketGenerationId'),
+      summaryFileKey: a.string(), // S3 key for SUMMARY.md
+      executionPlanFileKey: a.string(), // S3 key for EXECUTION_PLAN.md
+      intermediateResults: a.json(), // Store pipeline intermediate data
+      errorMessage: a.string(),
+      tokensUsed: a.integer(),
+      totalCost: a.float(), // Estimated cost in USD
+      generatedAt: a.datetime(),
       createdAt: a.datetime(),
       updatedAt: a.datetime(),
     })
