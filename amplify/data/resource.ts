@@ -37,6 +37,22 @@ const schema = a.schema({
       updatedAt: a.datetime(),
     })
     .authorization((allow) => [allow.publicApiKey()]),
+
+  SpecificationDraft: a
+    .model({
+      content: a.string(),
+      conversationHistory: a.json(), // Store conversation turns
+      aiSuggestions: a.json(),
+      version: a.integer(),
+      projectId: a.id().required(),
+      project: a.belongsTo('Project', 'projectId'),
+      status: a.enum(['draft', 'reviewing', 'finalized']),
+      type: a.enum(['ANALYSIS', 'FIXES', 'PLANS', 'REVIEWS']),
+      sessionId: a.string(), // For conversation session management
+      createdAt: a.datetime(),
+      updatedAt: a.datetime(),
+    })
+    .authorization((allow) => [allow.publicApiKey()]),
 });
 
 export type Schema = ClientSchema<typeof schema>;

@@ -309,3 +309,173 @@ export const ticketAPI = {
     return data;
   },
 };
+
+// SpecificationDraft operations
+export const specificationDraftAPI = {
+  list: async (projectId?: string) => {
+    if (projectId) {
+      const { data, errors } = await client.models.SpecificationDraft.list({
+        filter: { projectId: { eq: projectId } },
+      });
+      if (errors) throw new Error(errors[0].message);
+      return data.map(item => ({
+        id: item.id,
+        content: item.content,
+        conversationHistory: item.conversationHistory 
+          ? JSON.parse(item.conversationHistory as string) 
+          : null,
+        aiSuggestions: item.aiSuggestions 
+          ? JSON.parse(item.aiSuggestions as string) 
+          : null,
+        version: item.version,
+        projectId: item.projectId,
+        status: item.status,
+        type: item.type,
+        sessionId: item.sessionId,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+      }));
+    }
+    const { data, errors } = await client.models.SpecificationDraft.list();
+    if (errors) throw new Error(errors[0].message);
+    return data.map(item => ({
+      id: item.id,
+      content: item.content,
+      conversationHistory: item.conversationHistory 
+        ? JSON.parse(item.conversationHistory as string) 
+        : null,
+      aiSuggestions: item.aiSuggestions 
+        ? JSON.parse(item.aiSuggestions as string) 
+        : null,
+      version: item.version,
+      projectId: item.projectId,
+      status: item.status,
+      type: item.type,
+      sessionId: item.sessionId,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+    }));
+  },
+
+  create: async (draft: {
+    content?: string;
+    conversationHistory?: any;
+    aiSuggestions?: any;
+    version?: number;
+    projectId: string;
+    status?: 'draft' | 'reviewing' | 'finalized';
+    type?: 'ANALYSIS' | 'FIXES' | 'PLANS' | 'REVIEWS';
+    sessionId?: string;
+  }) => {
+    const { data, errors } = await client.models.SpecificationDraft.create({
+      content: draft.content || '',
+      conversationHistory: draft.conversationHistory 
+        ? JSON.stringify(draft.conversationHistory) 
+        : null,
+      aiSuggestions: draft.aiSuggestions 
+        ? JSON.stringify(draft.aiSuggestions) 
+        : null,
+      version: draft.version || 1,
+      projectId: draft.projectId,
+      status: draft.status || 'draft',
+      type: draft.type,
+      sessionId: draft.sessionId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    if (errors) throw new Error(errors[0].message);
+    if (!data) throw new Error('Failed to create draft');
+    return {
+      id: data.id,
+      content: data.content,
+      conversationHistory: data.conversationHistory 
+        ? JSON.parse(data.conversationHistory as string) 
+        : null,
+      aiSuggestions: data.aiSuggestions 
+        ? JSON.parse(data.aiSuggestions as string) 
+        : null,
+      version: data.version,
+      projectId: data.projectId,
+      status: data.status,
+      type: data.type,
+      sessionId: data.sessionId,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
+    };
+  },
+
+  get: async (id: string) => {
+    const { data, errors } = await client.models.SpecificationDraft.get({ id });
+    if (errors) throw new Error(errors[0].message);
+    if (!data) throw new Error('Draft not found');
+    return {
+      id: data.id,
+      content: data.content,
+      conversationHistory: data.conversationHistory 
+        ? JSON.parse(data.conversationHistory as string) 
+        : null,
+      aiSuggestions: data.aiSuggestions 
+        ? JSON.parse(data.aiSuggestions as string) 
+        : null,
+      version: data.version,
+      projectId: data.projectId,
+      status: data.status,
+      type: data.type,
+      sessionId: data.sessionId,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
+    };
+  },
+
+  update: async (
+    id: string,
+    updates: Partial<{
+      content: string;
+      conversationHistory: any;
+      aiSuggestions: any;
+      version: number;
+      status: 'draft' | 'reviewing' | 'finalized';
+      type: 'ANALYSIS' | 'FIXES' | 'PLANS' | 'REVIEWS';
+    }>
+  ) => {
+    const updateData: any = { id, updatedAt: new Date().toISOString() };
+    
+    if (updates.content !== undefined) updateData.content = updates.content;
+    if (updates.conversationHistory !== undefined) {
+      updateData.conversationHistory = JSON.stringify(updates.conversationHistory);
+    }
+    if (updates.aiSuggestions !== undefined) {
+      updateData.aiSuggestions = JSON.stringify(updates.aiSuggestions);
+    }
+    if (updates.version !== undefined) updateData.version = updates.version;
+    if (updates.status !== undefined) updateData.status = updates.status;
+    if (updates.type !== undefined) updateData.type = updates.type;
+
+    const { data, errors } = await client.models.SpecificationDraft.update(updateData);
+    if (errors) throw new Error(errors[0].message);
+    if (!data) throw new Error('Draft not found');
+    return {
+      id: data.id,
+      content: data.content,
+      conversationHistory: data.conversationHistory 
+        ? JSON.parse(data.conversationHistory as string) 
+        : null,
+      aiSuggestions: data.aiSuggestions 
+        ? JSON.parse(data.aiSuggestions as string) 
+        : null,
+      version: data.version,
+      projectId: data.projectId,
+      status: data.status,
+      type: data.type,
+      sessionId: data.sessionId,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
+    };
+  },
+
+  delete: async (id: string) => {
+    const { data, errors } = await client.models.SpecificationDraft.delete({ id });
+    if (errors) throw new Error(errors[0].message);
+    return data;
+  },
+};
