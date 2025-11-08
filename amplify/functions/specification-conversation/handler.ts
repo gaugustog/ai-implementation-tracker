@@ -1,7 +1,7 @@
 import {
   BedrockRuntimeClient,
   ConverseStreamCommand,
-  ContentBlock,
+  ConverseStreamCommandOutput,
   Message,
 } from '@aws-sdk/client-bedrock-runtime';
 
@@ -51,7 +51,7 @@ Your role is to:
 Your role is to:
 - Break down work into logical phases
 - Identify dependencies and risks
-- Suggest realistic timelines
+- Suggest realistic timelines considering the AI implementation context
 - Structure the plan with: Goals, Phases, Tasks, Milestones, Resources, etc.
 - Be practical and detailed`,
 
@@ -112,7 +112,7 @@ export const handler = async (event: any) => {
       },
     });
 
-    const response = await bedrockClient.send(command);
+    const response: ConverseStreamCommandOutput = await bedrockClient.send(command);
 
     // Handle streaming response
     if (!response.stream) {
