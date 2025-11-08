@@ -45,3 +45,5 @@ amplify_outputs.json
 .amplify
 amplify/node_modules
 .amplify-hosting
+amplify/functions/node_modules
+amplify/functions/**/node_modules
