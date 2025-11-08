@@ -138,8 +138,13 @@ export function useSpecificationConversation({
 }
 
 /**
- * Generate a unique session ID
+ * Generate a unique session ID using crypto for security
  */
 function generateSessionId(): string {
-  return `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+  // Use crypto.randomUUID if available (modern browsers)
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return `session_${crypto.randomUUID()}`;
+  }
+  // Fallback to timestamp-based ID (less secure but works everywhere)
+  return `session_${Date.now()}_${performance.now().toString(36)}`;
 }
