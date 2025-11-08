@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   Card, 
   CardContent, 
@@ -17,11 +18,12 @@ import {
   CircularProgress,
   Alert
 } from '@mui/material';
-import { Plus, FolderKanban, Calendar, FileText } from 'lucide-react';
+import { Plus, FolderKanban, Calendar, FileText, Settings } from 'lucide-react';
 import type { Project } from '@/lib/types';
 import { projectAPI } from '@/lib/api/amplify';
 
 export default function ProjectsPage() {
+  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [newProject, setNewProject] = useState({ name: '', description: '' });
@@ -143,14 +145,28 @@ export default function ProjectsPage() {
                   },
                   transition: 'border-color 0.2s',
                   height: '100%',
+                  cursor: 'pointer',
                 }}
+                onClick={() => router.push(`/projects/${project.id}`)}
               >
                 <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'start', mb: 2 }}>
-                    <FolderKanban size={24} className="text-rose-500 mr-2" />
-                    <Typography variant="h6" sx={{ fontWeight: 600, color: 'rgb(250 250 250)' }}>
-                      {project.name}
-                    </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'start' }}>
+                      <FolderKanban size={24} className="text-rose-500 mr-2" />
+                      <Typography variant="h6" sx={{ fontWeight: 600, color: 'rgb(250 250 250)' }}>
+                        {project.name}
+                      </Typography>
+                    </Box>
+                    <Button
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/projects/${project.id}`);
+                      }}
+                      sx={{ minWidth: 'auto', p: 0.5, color: 'rgb(161 161 170)' }}
+                    >
+                      <Settings size={18} />
+                    </Button>
                   </Box>
                   <Typography variant="body2" sx={{ color: 'rgb(161 161 170)', mb: 2 }}>
                     {project.description || 'No description'}

@@ -5,6 +5,8 @@ import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { storage } from './storage/resource';
 import { specificationConversation } from './functions/specification-conversation/resource';
+import { gitIntegration } from './functions/git-integration/resource';
+import { codeAnalyzer } from './functions/code-analyzer/resource';
 
 /**
  * @see https://docs.amplify.aws/react/build-a-backend/ to add storage, functions, and more
@@ -14,6 +16,8 @@ const backend = defineBackend({
   data,
   storage,
   specificationConversation,
+  gitIntegration,
+  codeAnalyzer,
 });
 
 // Grant Bedrock permissions to the conversation function
@@ -46,5 +50,77 @@ const functionUrl = backend.specificationConversation.resources.lambda.addFuncti
 backend.addOutput({
   custom: {
     specificationConversationUrl: functionUrl.url,
+  },
+});
+
+// Configure Git Integration function
+const gitIntegrationFunctionUrl = backend.gitIntegration.resources.lambda.addFunctionUrl({
+  authType: FunctionUrlAuthType.NONE,
+  cors: {
+    allowedOrigins: ['*'],
+    allowedMethods: [HttpMethod.POST, HttpMethod.OPTIONS],
+    allowedHeaders: ['Content-Type'],
+  },
+});
+
+// Grant permissions to Git Integration function
+const gitIntegrationPolicy = new Policy(
+  backend.gitIntegration.resources.lambda,
+  'GitIntegrationPolicy',
+  {
+    statements: [
+      new PolicyStatement({
+        actions: ['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:UpdateItem', 'dynamodb:Query', 'dynamodb:Scan'],
+        resources: ['*'], // In production, specify exact table ARNs
+      }),
+      new PolicyStatement({
+        actions: ['s3:PutObject', 's3:GetObject'],
+        resources: [`${backend.storage.resources.bucket.bucketArn}/*`],
+      }),
+      new PolicyStatement({
+        actions: ['kms:Encrypt', 'kms:Decrypt'],
+        resources: ['*'], // In production, specify KMS key ARN
+      }),
+    ],
+  }
+);
+
+backend.gitIntegration.resources.lambda.role?.attachInlinePolicy(gitIntegrationPolicy);
+
+// Configure Code Analyzer function
+const codeAnalyzerFunctionUrl = backend.codeAnalyzer.resources.lambda.addFunctionUrl({
+  authType: FunctionUrlAuthType.NONE,
+  cors: {
+    allowedOrigins: ['*'],
+    allowedMethods: [HttpMethod.POST, HttpMethod.OPTIONS],
+    allowedHeaders: ['Content-Type'],
+  },
+});
+
+// Grant permissions to Code Analyzer function
+const codeAnalyzerPolicy = new Policy(
+  backend.codeAnalyzer.resources.lambda,
+  'CodeAnalyzerPolicy',
+  {
+    statements: [
+      new PolicyStatement({
+        actions: ['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:UpdateItem', 'dynamodb:Query', 'dynamodb:Scan'],
+        resources: ['*'], // In production, specify exact table ARNs
+      }),
+      new PolicyStatement({
+        actions: ['s3:GetObject', 's3:PutObject'],
+        resources: [`${backend.storage.resources.bucket.bucketArn}/*`],
+      }),
+    ],
+  }
+);
+
+backend.codeAnalyzer.resources.lambda.role?.attachInlinePolicy(codeAnalyzerPolicy);
+
+// Add function URLs to outputs
+backend.addOutput({
+  custom: {
+    gitIntegrationUrl: gitIntegrationFunctionUrl.url,
+    codeAnalyzerUrl: codeAnalyzerFunctionUrl.url,
   },
 });

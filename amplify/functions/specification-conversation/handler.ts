@@ -20,6 +20,12 @@ interface SpecificationContext {
   projectDescription?: string;
   specType: 'ANALYSIS' | 'FIXES' | 'PLANS' | 'REVIEWS';
   existingContent?: string;
+  codebaseContext?: {
+    techStack?: any;
+    patterns?: any;
+    integrationPoints?: any;
+    relevantFiles?: string[];
+  };
 }
 
 interface ConversationRequest {
@@ -174,11 +180,65 @@ function buildSystemPrompt(context: SpecificationContext): string {
   if (context.projectDescription) {
     contextInfo += `\nProject Description: ${context.projectDescription}`;
   }
+  
+  // Add codebase context if available
+  if (context.codebaseContext) {
+    contextInfo += '\n\n## Codebase Context';
+    
+    if (context.codebaseContext.techStack) {
+      const techStack = context.codebaseContext.techStack;
+      contextInfo += '\n\n### Technology Stack';
+      
+      if (techStack.languages?.length) {
+        contextInfo += `\n- Languages: ${techStack.languages.join(', ')}`;
+      }
+      if (techStack.frameworks?.length) {
+        contextInfo += `\n- Frameworks: ${techStack.frameworks.join(', ')}`;
+      }
+      if (techStack.buildTools?.length) {
+        contextInfo += `\n- Build Tools: ${techStack.buildTools.join(', ')}`;
+      }
+    }
+    
+    if (context.codebaseContext.patterns) {
+      const patterns = context.codebaseContext.patterns;
+      contextInfo += '\n\n### Code Patterns';
+      
+      if (patterns.architecturePattern) {
+        contextInfo += `\n- Architecture: ${patterns.architecturePattern}`;
+      }
+      if (patterns.testingStrategy) {
+        contextInfo += `\n- Testing: ${patterns.testingStrategy}`;
+      }
+    }
+    
+    if (context.codebaseContext.integrationPoints?.length) {
+      contextInfo += '\n\n### Key Integration Points';
+      context.codebaseContext.integrationPoints.slice(0, 5).forEach((point: any) => {
+        contextInfo += `\n- ${point.file}: ${point.purpose}`;
+      });
+    }
+    
+    if (context.codebaseContext.relevantFiles?.length) {
+      contextInfo += '\n\n### Relevant Files';
+      context.codebaseContext.relevantFiles.slice(0, 10).forEach((file: string) => {
+        contextInfo += `\n- ${file}`;
+      });
+    }
+  }
+  
   if (context.existingContent) {
-    contextInfo += `\n\nCurrent Draft:\n${context.existingContent}`;
+    contextInfo += `\n\n## Current Draft\n${context.existingContent}`;
   }
 
-  return `${basePrompt}${contextInfo}
+  const instructions = context.codebaseContext
+    ? `\n\nPlease help the user build a comprehensive ${context.specType} specification by:
+- Asking questions and making suggestions
+- Following the existing code patterns and conventions from the codebase
+- Considering the current technology stack and architecture
+- Suggesting integration with existing components where appropriate
+- Structuring the content in markdown format`
+    : `\n\nPlease help the user build a comprehensive ${context.specType} specification by asking questions, making suggestions, and helping structure the content in markdown format.`;
 
-Please help the user build a comprehensive ${context.specType} specification by asking questions, making suggestions, and helping structure the content in markdown format.`;
+  return `${basePrompt}${contextInfo}${instructions}`;
 }
