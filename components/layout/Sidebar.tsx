@@ -10,8 +10,7 @@ import {
   ListTodo,
   Settings,
   Menu,
-  X,
-  Sparkles
+  X
 } from 'lucide-react';
 import { Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, IconButton } from '@mui/material';
 
@@ -19,7 +18,6 @@ const menuItems = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Projects', href: '/projects', icon: FolderKanban },
   { name: 'Specifications', href: '/specifications', icon: FileText },
-  { name: 'AI Spec Builder', href: '/spec-builder', icon: Sparkles },
   { name: 'Tickets', href: '/tickets', icon: ListTodo },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
