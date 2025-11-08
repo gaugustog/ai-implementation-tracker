@@ -153,11 +153,8 @@ const ticketGenerationPolicy = new Policy(
 
 backend.ticketGeneration.resources.lambda.role?.attachInlinePolicy(ticketGenerationPolicy);
 
-// Add storage bucket name to Lambda environment
-backend.ticketGeneration.resources.lambda.addEnvironment(
-  'STORAGE_BUCKET_NAME',
-  backend.storage.resources.bucket.bucketName
-);
+// Set storage bucket name environment variable
+backend.ticketGeneration.addEnvironment('STORAGE_BUCKET_NAME', backend.storage.resources.bucket.bucketName);
 
 // Add function URLs to outputs
 backend.addOutput({

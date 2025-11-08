@@ -170,7 +170,7 @@ export function TicketCard({
                       isApproved ? onUnapprove(ticket.ticketNumber) : onApprove(ticket.ticketNumber)
                     }
                     variant={isApproved ? 'outlined' : 'contained'}
-                    color={isApproved ? 'default' : 'success'}
+                    color={isApproved ? 'inherit' : 'success'}
                   >
                     {isApproved ? 'Desaprovar' : 'Aprovar'}
                   </Button>
@@ -220,7 +220,7 @@ export function TicketCard({
 
           {/* Additional Details */}
           <Grid container spacing={2}>
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Typography variant="subtitle2" gutterBottom>
                 Expertise Necessária:
               </Typography>
@@ -231,7 +231,7 @@ export function TicketCard({
               </Stack>
             </Grid>
 
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Typography variant="subtitle2" gutterBottom>
                 Estratégia de Teste:
               </Typography>
@@ -241,7 +241,7 @@ export function TicketCard({
             </Grid>
 
             {showDependencies && ticket.dependencies.length > 0 && (
-              <Grid item xs={12}>
+              <Grid size={{ xs: 12 }}>
                 <Typography variant="subtitle2" gutterBottom>
                   Dependências:
                 </Typography>

@@ -5,4 +5,7 @@ export const ticketGeneration = defineFunction({
   entry: './handler.ts',
   timeoutSeconds: 900, // 15 minutes for complex processing
   memoryMB: 1024,
+  environment: {
+    STORAGE_BUCKET_NAME: '', // Will be set by backend configuration
+  },
 });

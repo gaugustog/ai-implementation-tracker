@@ -289,7 +289,7 @@ Retorne um array JSON de tickets.`;
     estimatedMinutes: Math.min(t.estimatedMinutes || t.estimated_minutes || 480, 1440),
     complexity: t.complexity || 'medium',
     parallelizable: t.parallelizable ?? false,
-    aiAgentCapable: t.aiAgentCapable || t.ai_agent_capable ?? false,
+    aiAgentCapable: (t.aiAgentCapable || t.ai_agent_capable) ?? false,
     requiredExpertise: t.requiredExpertise || t.required_expertise || [],
     testingStrategy: t.testingStrategy || t.testing_strategy || 'Testes manuais básicos',
     rollbackPlan: t.rollbackPlan || t.rollback_plan || 'Reverter commit',

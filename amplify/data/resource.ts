@@ -71,7 +71,7 @@ const schema = a.schema({
       ticket: a.belongsTo('Ticket', 'ticketId'),
       dependsOnId: a.id().required(),
       dependsOn: a.belongsTo('Ticket', 'dependsOnId'),
-      dependencyType: a.enum(['blocks', 'requires', 'relates_to']).default('blocks'),
+      dependencyType: a.enum(['blocks', 'requires', 'relates_to']),
       createdAt: a.datetime(),
     })
     .authorization((allow) => [allow.publicApiKey()]),
