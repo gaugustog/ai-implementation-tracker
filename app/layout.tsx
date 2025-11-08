@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import ThemeRegistry from "@/components/ThemeRegistry";
+import AmplifyProvider from "@/components/AmplifyProvider";
 import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 import { Box, Toolbar } from "@mui/material";
@@ -18,25 +19,27 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        <ThemeRegistry>
-          <Box sx={{ display: 'flex' }}>
-            <Header />
-            <Sidebar />
-            <Box
-              component="main"
-              sx={{
-                flexGrow: 1,
-                p: 3,
-                width: { xs: '100%', md: 'calc(100% - 280px)' },
-                ml: { xs: 0, md: '280px' },
-                minHeight: '100vh',
-              }}
-            >
-              <Toolbar />
-              {children}
+        <AmplifyProvider>
+          <ThemeRegistry>
+            <Box sx={{ display: 'flex' }}>
+              <Header />
+              <Sidebar />
+              <Box
+                component="main"
+                sx={{
+                  flexGrow: 1,
+                  p: 3,
+                  width: { xs: '100%', md: 'calc(100% - 280px)' },
+                  ml: { xs: 0, md: '280px' },
+                  minHeight: '100vh',
+                }}
+              >
+                <Toolbar />
+                {children}
+              </Box>
             </Box>
-          </Box>
-        </ThemeRegistry>
+          </ThemeRegistry>
+        </AmplifyProvider>
       </body>
     </html>
   );

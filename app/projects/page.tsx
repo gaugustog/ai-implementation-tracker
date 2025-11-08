@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Card, 
   CardContent, 
@@ -13,29 +13,53 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Chip
+  Chip,
+  CircularProgress,
+  Alert
 } from '@mui/material';
 import { Plus, FolderKanban, Calendar, FileText } from 'lucide-react';
 import type { Project } from '@/lib/types';
+import { projectAPI } from '@/lib/api/amplify';
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [newProject, setNewProject] = useState({ name: '', description: '' });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleCreateProject = () => {
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
+  const loadProjects = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await projectAPI.list();
+      setProjects(data as Project[]);
+    } catch (err) {
+      console.error('Error loading projects:', err);
+      setError('Failed to load projects. Using placeholder configuration.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateProject = async () => {
     if (newProject.name.trim()) {
-      const project: Project = {
-        id: Date.now().toString(),
-        name: newProject.name,
-        description: newProject.description,
-        specifications: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      setProjects([...projects, project]);
-      setNewProject({ name: '', description: '' });
-      setOpenDialog(false);
+      try {
+        const project = await projectAPI.create({
+          name: newProject.name,
+          description: newProject.description,
+        });
+        setProjects([...projects, project as Project]);
+        setNewProject({ name: '', description: '' });
+        setOpenDialog(false);
+      } catch (err) {
+        console.error('Error creating project:', err);
+        setError('Failed to create project. Please check your Amplify configuration.');
+      }
     }
   };
 
@@ -65,7 +89,17 @@ export default function ProjectsPage() {
         </Button>
       </Box>
 
-      {projects.length === 0 ? (
+      {error && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <CircularProgress sx={{ color: 'rgb(244 63 94)' }} />
+        </Box>
+      ) : projects.length === 0 ? (
         <Card
           sx={{
             backgroundColor: 'rgb(39 39 42)',
@@ -124,7 +158,7 @@ export default function ProjectsPage() {
                   <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
                     <Chip
                       icon={<FileText size={14} />}
-                      label={`${project.specifications.length} specs`}
+                      label={`${project.specifications?.length || 0} specs`}
                       size="small"
                       sx={{
                         backgroundColor: 'rgb(24 24 27)',
@@ -136,7 +170,7 @@ export default function ProjectsPage() {
                   <Box sx={{ display: 'flex', alignItems: 'center', color: 'rgb(161 161 170)' }}>
                     <Calendar size={14} className="mr-1" />
                     <Typography variant="caption">
-                      {new Date(project.createdAt).toLocaleDateString()}
+                      {project.createdAt ? new Date(project.createdAt).toLocaleDateString() : 'N/A'}
                     </Typography>
                   </Box>
                 </CardContent>
