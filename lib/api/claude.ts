@@ -17,8 +17,8 @@ export async function generateSpecification(
     content: `Generated specification for ${type}:\n\n${prompt}`,
     tickets: [],
     projectId,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 }
 
@@ -36,8 +36,8 @@ export async function generateTickets(
       description: `Task ${i} extracted from specification ${specification.id}`,
       status: 'todo',
       specType: specification.type,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
   }
   

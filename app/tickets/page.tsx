@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -13,13 +13,36 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
-import { ListTodo, Plus, Circle, Clock, CheckCircle2 } from 'lucide-react';
+import { ListTodo, Plus, Circle, Clock, CheckCircle2, FileText } from 'lucide-react';
 import type { Ticket } from '@/lib/types';
+import { ticketAPI } from '@/lib/api/amplify';
 
 export default function TicketsPage() {
-  const [tickets] = useState<Ticket[]>([]);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'todo' | 'in-progress' | 'done'>('all');
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'todo' | 'in_progress' | 'done'>('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadTickets();
+  }, []);
+
+  const loadTickets = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await ticketAPI.list();
+      setTickets(data as Ticket[]);
+    } catch (err) {
+      console.error('Error loading tickets:', err);
+      setError('Failed to load tickets. Using placeholder configuration.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredTickets = statusFilter === 'all'
     ? tickets
@@ -29,7 +52,7 @@ export default function TicketsPage() {
     switch (status) {
       case 'todo':
         return <Circle size={16} />;
-      case 'in-progress':
+      case 'in_progress':
         return <Clock size={16} />;
       case 'done':
         return <CheckCircle2 size={16} />;
@@ -40,14 +63,15 @@ export default function TicketsPage() {
     switch (status) {
       case 'todo':
         return 'rgb(161 161 170)';
-      case 'in-progress':
+      case 'in_progress':
         return 'rgb(59 130 246)';
       case 'done':
         return 'rgb(34 197 94)';
     }
   };
 
-  const getSpecTypeColor = (type: string) => {
+  const getSpecTypeColor = (type?: string | null) => {
+    if (!type) return 'rgb(161 161 170)';
     switch (type) {
       case 'ANALYSIS':
         return 'rgb(59 130 246)';
@@ -70,7 +94,7 @@ export default function TicketsPage() {
             Tickets
           </Typography>
           <Typography variant="body1" sx={{ color: 'rgb(161 161 170)' }}>
-            Track and manage specification tickets
+            Track and manage specification tickets with markdown files in S3
           </Typography>
         </div>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
@@ -79,7 +103,7 @@ export default function TicketsPage() {
             <Select
               value={statusFilter}
               label="Status"
-              onChange={(e) => setStatusFilter(e.target.value as 'all' | 'todo' | 'in-progress' | 'done')}
+              onChange={(e) => setStatusFilter(e.target.value as 'all' | 'todo' | 'in_progress' | 'done')}
               sx={{
                 color: 'rgb(250 250 250)',
                 '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgb(63 63 70)' },
@@ -89,7 +113,7 @@ export default function TicketsPage() {
             >
               <MenuItem value="all">All</MenuItem>
               <MenuItem value="todo">To Do</MenuItem>
-              <MenuItem value="in-progress">In Progress</MenuItem>
+              <MenuItem value="in_progress">In Progress</MenuItem>
               <MenuItem value="done">Done</MenuItem>
             </Select>
           </FormControl>
@@ -107,6 +131,12 @@ export default function TicketsPage() {
           </Button>
         </Box>
       </Box>
+
+      {error && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
 
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, sm: 4 }}>
@@ -138,7 +168,7 @@ export default function TicketsPage() {
                 In Progress
               </Typography>
               <Typography variant="h4" sx={{ fontWeight: 700, color: 'rgb(59 130 246)' }}>
-                {tickets.filter(t => t.status === 'in-progress').length}
+                {tickets.filter(t => t.status === 'in_progress').length}
               </Typography>
             </CardContent>
           </Card>
@@ -162,7 +192,11 @@ export default function TicketsPage() {
         </Grid>
       </Grid>
 
-      {filteredTickets.length === 0 ? (
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <CircularProgress sx={{ color: 'rgb(244 63 94)' }} />
+        </Box>
+      ) : filteredTickets.length === 0 ? (
         <Card
           sx={{
             backgroundColor: 'rgb(39 39 42)',
@@ -200,32 +234,46 @@ export default function TicketsPage() {
                     <Typography variant="h6" sx={{ fontWeight: 600, color: 'rgb(250 250 250)' }}>
                       {ticket.title}
                     </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', color: getStatusColor(ticket.status) }}>
-                      {getStatusIcon(ticket.status)}
+                    <Box sx={{ display: 'flex', alignItems: 'center', color: getStatusColor(ticket.status || 'todo') }}>
+                      {getStatusIcon(ticket.status || 'todo')}
                     </Box>
                   </Box>
                   <Typography variant="body2" sx={{ color: 'rgb(161 161 170)', mb: 2 }}>
-                    {ticket.description}
+                    {ticket.description || 'No description'}
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {ticket.specType && (
+                      <Chip
+                        label={ticket.specType}
+                        size="small"
+                        sx={{
+                          backgroundColor: getSpecTypeColor(ticket.specType),
+                          color: '#fff',
+                          fontWeight: 600,
+                        }}
+                      />
+                    )}
                     <Chip
-                      label={ticket.specType}
-                      size="small"
-                      sx={{
-                        backgroundColor: getSpecTypeColor(ticket.specType),
-                        color: '#fff',
-                        fontWeight: 600,
-                      }}
-                    />
-                    <Chip
-                      label={ticket.status}
+                      label={ticket.status || 'todo'}
                       size="small"
                       sx={{
                         backgroundColor: 'rgb(24 24 27)',
-                        color: getStatusColor(ticket.status),
+                        color: getStatusColor(ticket.status || 'todo'),
                         border: '1px solid rgb(63 63 70)',
                       }}
                     />
+                    {ticket.fileKey && (
+                      <Chip
+                        icon={<FileText size={14} />}
+                        label="Has file"
+                        size="small"
+                        sx={{
+                          backgroundColor: 'rgb(24 24 27)',
+                          color: 'rgb(161 161 170)',
+                          border: '1px solid rgb(63 63 70)',
+                        }}
+                      />
+                    )}
                   </Box>
                 </CardContent>
               </Card>

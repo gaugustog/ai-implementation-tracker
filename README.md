@@ -1,6 +1,6 @@
 # Spec-Driven Development Tracker
 
-A Next.js dashboard application for managing spec-driven development projects with Claude CLI integration.
+A Next.js dashboard application for managing spec-driven development projects with AWS Amplify Gen2 integration.
 
 ## Features
 
@@ -10,7 +10,8 @@ A Next.js dashboard application for managing spec-driven development projects wi
 - 📁 **Project Management**: Create and manage development projects
 - 📝 **Specification Management**: Organize specs by type (ANALYSIS, FIXES, PLANS, REVIEWS)
 - 🎫 **Ticket System**: Break down specifications into actionable tickets
-- 🤖 **Claude CLI Integration**: Generate specifications using AI (mock implementation included)
+- ☁️ **AWS Amplify Gen2**: Backend powered by AppSync and S3 storage
+- 📄 **Markdown Files**: Store specifications and tickets as .md files in S3
 
 ## Tech Stack
 
@@ -19,14 +20,45 @@ A Next.js dashboard application for managing spec-driven development projects wi
 - **Styling**: Tailwind CSS v4 with dark mode
 - **Icons**: Lucide React
 - **Language**: TypeScript
+- **Backend**: AWS Amplify Gen2
+- **API**: AWS AppSync (GraphQL)
+- **Storage**: Amazon S3
 
 ## Getting Started
+
+### Prerequisites
+
+- Node.js 18+ installed
+- AWS account (for backend deployment)
+- AWS CLI configured (optional)
+
+### Installation
 
 First, install dependencies:
 
 ```bash
 npm install
 ```
+
+### AWS Amplify Setup
+
+To use the full backend capabilities, you need to deploy the AWS Amplify backend:
+
+```bash
+cd amplify
+npm run sandbox
+```
+
+This will deploy:
+- AppSync GraphQL API for data management
+- S3 bucket for markdown file storage
+- API key for public access (no authentication)
+
+After deployment, the generated `amplify_outputs.json` will be automatically used by the application.
+
+For detailed setup instructions, see [AMPLIFY_SETUP.md](./AMPLIFY_SETUP.md).
+
+### Run Development Server
 
 Then, run the development server:
 
@@ -46,14 +78,22 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 │   ├── settings/            # Settings page
 │   ├── layout.tsx           # Root layout with sidebar and header
 │   └── page.tsx             # Dashboard home page
+├── amplify/                 # AWS Amplify Gen2 backend
+│   ├── backend.ts          # Backend configuration
+│   ├── data/               # AppSync data schema
+│   └── storage/            # S3 storage configuration
 ├── components/
 │   ├── layout/              # Layout components
 │   │   ├── Header.tsx       # Top navigation bar
 │   │   └── Sidebar.tsx      # Side navigation menu
+│   ├── AmplifyProvider.tsx  # Amplify context provider
 │   └── ThemeRegistry.tsx    # Material UI theme provider
 ├── lib/
+│   ├── amplify-config.ts    # Amplify client configuration
 │   ├── api/                 # API utilities
-│   │   └── claude.ts        # Claude CLI integration
+│   │   ├── amplify.ts       # AppSync API operations
+│   │   ├── storage.ts       # S3 storage operations
+│   │   └── claude.ts        # Claude CLI integration (mock)
 │   └── types/               # TypeScript type definitions
 │       └── index.ts
 └── public/                  # Static assets
@@ -68,15 +108,30 @@ The application manages four types of specifications:
 - **PLANS**: Implementation plans and roadmaps
 - **REVIEWS**: Code and design reviews
 
-Each specification can be broken down into multiple tickets for easier management.
+Each specification:
+- Can be stored as a markdown file in S3
+- Can be broken down into multiple tickets
+- Is associated with a project
 
-## Claude CLI Integration
+## Data Management
 
-The application includes a mock implementation of Claude CLI integration in `lib/api/claude.ts`. To integrate with actual Claude CLI:
+### Local Development
+Without AWS backend deployment, the app will show placeholder messages. Deploy the Amplify backend to enable full functionality.
 
-1. Install Claude CLI
-2. Configure API keys in Settings
-3. Replace mock functions with actual CLI calls
+### With AWS Backend
+- **Projects**: Stored in AppSync (DynamoDB)
+- **Specifications**: Metadata in AppSync, content in S3 as .md files
+- **Tickets**: Metadata in AppSync, content in S3 as .md files
+- **No Authentication**: Public API key access for simplicity
+
+## AWS Amplify Integration
+
+The application uses AWS Amplify Gen2 with:
+- **AppSync**: GraphQL API for managing projects, specifications, and tickets
+- **S3**: Storage for markdown files
+- **API Key**: Public access without authentication
+
+See [AMPLIFY_SETUP.md](./AMPLIFY_SETUP.md) for detailed setup instructions.
 
 ## Development
 
