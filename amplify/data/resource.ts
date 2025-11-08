@@ -8,6 +8,7 @@ const schema = a.schema({
       createdAt: a.datetime(),
       updatedAt: a.datetime(),
       specifications: a.hasMany('Specification', 'projectId'),
+      gitRepository: a.hasOne('GitRepository', 'projectId'),
     })
     .authorization((allow) => [allow.publicApiKey()]),
 
@@ -49,6 +50,51 @@ const schema = a.schema({
       status: a.enum(['draft', 'reviewing', 'finalized']),
       type: a.enum(['ANALYSIS', 'FIXES', 'PLANS', 'REVIEWS']),
       sessionId: a.string(), // For conversation session management
+      createdAt: a.datetime(),
+      updatedAt: a.datetime(),
+    })
+    .authorization((allow) => [allow.publicApiKey()]),
+
+  GitRepository: a
+    .model({
+      projectId: a.id().required(),
+      project: a.belongsTo('Project', 'projectId'),
+      provider: a.enum(['github']),
+      repoUrl: a.string().required(),
+      branch: a.string().default('main'),
+      accessTokenHash: a.string(), // Encrypted token hash
+      webhookSecret: a.string(),
+      lastSyncedAt: a.datetime(),
+      syncStatus: a.enum(['pending', 'syncing', 'synced', 'failed']),
+      lastCommitHash: a.string(),
+      snapshots: a.hasMany('CodeSnapshot', 'repositoryId'),
+      createdAt: a.datetime(),
+      updatedAt: a.datetime(),
+    })
+    .authorization((allow) => [allow.publicApiKey()]),
+
+  CodeSnapshot: a
+    .model({
+      repositoryId: a.id().required(),
+      repository: a.belongsTo('GitRepository', 'repositoryId'),
+      commitHash: a.string().required(),
+      fileTreeKey: a.string(), // S3 key for file tree JSON
+      metricsKey: a.string(), // S3 key for metrics JSON
+      analysisComplete: a.boolean().default(false),
+      createdAt: a.datetime(),
+    })
+    .authorization((allow) => [allow.publicApiKey()]),
+
+  ProjectContext: a
+    .model({
+      projectId: a.id().required(),
+      project: a.belongsTo('Project', 'projectId'),
+      techStack: a.json(), // Detected languages, frameworks, libraries
+      dependencies: a.json(), // Package.json, requirements.txt, etc.
+      fileStructure: a.json(), // Directory tree
+      patterns: a.json(), // Naming conventions, architecture patterns
+      integrationPoints: a.json(), // Key files and their purposes
+      lastAnalyzedAt: a.datetime(),
       createdAt: a.datetime(),
       updatedAt: a.datetime(),
     })
