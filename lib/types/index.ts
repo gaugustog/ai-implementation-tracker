@@ -31,3 +31,45 @@ export interface Project {
   createdAt?: string | null;
   updatedAt?: string | null;
 }
+
+export interface ConversationMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
+
+export interface SpecificationDraft {
+  id: string;
+  content?: string | null;
+  conversationHistory?: ConversationMessage[] | null;
+  aiSuggestions?: any | null;
+  version?: number | null;
+  projectId: string;
+  project?: Project;
+  status?: 'draft' | 'reviewing' | 'finalized' | null;
+  type?: SpecType | null;
+  sessionId?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface SpecificationContext {
+  projectId: string;
+  projectName?: string;
+  projectDescription?: string;
+  specType: SpecType;
+  existingContent?: string;
+}
+
+export interface ConversationRequest {
+  message: string;
+  conversationHistory: ConversationMessage[];
+  context: SpecificationContext;
+  sessionId: string;
+}
+
+export interface ConversationResponse {
+  response: string;
+  sessionId: string;
+  timestamp: string;
+}
