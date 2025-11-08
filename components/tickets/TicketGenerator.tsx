@@ -11,7 +11,6 @@ import {
   Alert,
   Chip,
   Stack,
-  Grid,
   Divider,
 } from '@mui/material';
 import {
@@ -142,8 +141,8 @@ export function TicketGenerator({
             Tickets gerados com sucesso! {result.tickets?.length || 0} tickets criados.
           </Alert>
 
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} sm={4}>
+          <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+            <Box sx={{ flex: '1 1 300px' }}>
               <Card>
                 <CardContent>
                   <Typography variant="h4" color="primary">
@@ -154,8 +153,8 @@ export function TicketGenerator({
                   </Typography>
                 </CardContent>
               </Card>
-            </Grid>
-            <Grid item xs={12} sm={4}>
+            </Box>
+            <Box sx={{ flex: '1 1 300px' }}>
               <Card>
                 <CardContent>
                   <Typography variant="h4" color="primary">
@@ -166,8 +165,8 @@ export function TicketGenerator({
                   </Typography>
                 </CardContent>
               </Card>
-            </Grid>
-            <Grid item xs={12} sm={4}>
+            </Box>
+            <Box sx={{ flex: '1 1 300px' }}>
               <Card>
                 <CardContent>
                   <Typography variant="h4" color="primary">
@@ -178,8 +177,8 @@ export function TicketGenerator({
                   </Typography>
                 </CardContent>
               </Card>
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
 
           <Card sx={{ mb: 2 }}>
             <CardContent>

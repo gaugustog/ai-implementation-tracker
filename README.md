@@ -9,9 +9,10 @@ A Next.js dashboard application for managing spec-driven development projects wi
 - 📊 **Dashboard**: Overview of projects, specifications, and tickets
 - 📁 **Project Management**: Create and manage development projects
 - 📝 **Specification Management**: Organize specs by type (ANALYSIS, FIXES, PLANS, REVIEWS)
-- 🎫 **Ticket System**: Break down specifications into actionable tickets
+- 🎫 **Intelligent Ticket Generation**: AI-powered automatic ticket creation with dependency analysis
 - 🤖 **AI-Powered Specifications**: Interactive specification builder with Amazon Bedrock
 - 🔗 **Git Integration**: Connect GitHub repositories for context-aware AI assistance
+- 📋 **Execution Planning**: Automated roadmaps with parallelization strategies for AI agents
 - ☁️ **AWS Amplify Gen2**: Backend powered by AppSync and S3 storage
 - 📄 **Markdown Files**: Store specifications and tickets as .md files in S3
 
@@ -142,13 +143,14 @@ Without AWS backend deployment, the app will show placeholder messages. Deploy t
 The application uses AWS Amplify Gen2 with:
 - **AppSync**: GraphQL API for managing projects, specifications, and tickets
 - **S3**: Storage for markdown files and codebase snapshots
-- **Lambda**: Serverless functions for AI chat and Git integration
+- **Lambda**: Serverless functions for AI chat, Git integration, and ticket generation
 - **API Key**: Public access without authentication
-- **Bedrock**: Amazon Bedrock with Claude for AI-powered specifications
+- **Bedrock**: Amazon Bedrock with Claude for AI-powered specifications and ticket generation
 
 See [AMPLIFY_SETUP.md](./AMPLIFY_SETUP.md) for detailed setup instructions.
 See [BEDROCK_INTEGRATION.md](./BEDROCK_INTEGRATION.md) for Bedrock integration details.
 See [GIT_INTEGRATION.md](./GIT_INTEGRATION.md) for Git integration guide.
+See [TICKET_GENERATION.md](./TICKET_GENERATION.md) for intelligent ticket generation guide.
 
 ## Development
 

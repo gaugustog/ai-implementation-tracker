@@ -1,11 +1,10 @@
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import {
-  BedrockRuntimeClient,
-  ConverseCommand,
-  ConverseCommandOutput,
-} from '@aws-sdk/client-bedrock-runtime';
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+  callBedrockWithRetry,
+  extractJSON,
+  validateSpecificationSize,
+} from './bedrock-utils';
 
-const bedrockClient = new BedrockRuntimeClient({ region: process.env.AWS_REGION || 'us-east-1' });
 const s3Client = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' });
 const BUCKET_NAME = process.env.STORAGE_BUCKET_NAME;
 
@@ -16,7 +15,7 @@ interface GeneratedTicket {
   acceptanceCriteria: string[];
   estimatedHours: number;
   complexity: 'simple' | 'medium' | 'complex';
-  dependencies: string[]; // References to other ticket IDs
+  dependencies: string[];
   parallelizable: boolean;
   aiAgentCapable: boolean;
   requiredExpertise: string[];
@@ -28,78 +27,76 @@ interface TicketGenerationRequest {
   specificationId: string;
   specificationContent: string;
   projectContext?: any;
-  language?: string; // Default: pt-BR
-}
-
-interface PipelineState {
-  parseSpecification?: any;
-  identifyComponents?: any;
-  generateTickets?: GeneratedTicket[];
-  analyzeDependencies?: any;
-  optimizeParallelization?: any;
-  generateDocuments?: {
-    summaryPath: string;
-    executionPlanPath: string;
-  };
+  language?: string;
 }
 
 /**
  * Main handler for ticket generation pipeline
  */
 export const handler = async (event: any) => {
-  console.log('Event:', JSON.stringify(event, null, 2));
+  console.log('Ticket generation started');
 
   try {
-    const request: TicketGenerationRequest = typeof event.body === 'string' 
-      ? JSON.parse(event.body) 
-      : event.body;
+    const request: TicketGenerationRequest =
+      typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
 
     const { specificationId, specificationContent, projectContext, language = 'pt-BR' } = request;
 
     if (!specificationId || !specificationContent) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: 'Missing required fields: specificationId or specificationContent' }),
+        body: JSON.stringify({
+          error: 'Missing required fields: specificationId or specificationContent',
+        }),
       };
     }
 
-    // Initialize pipeline state
-    const pipelineState: PipelineState = {};
+    // Validate specification size
+    try {
+      validateSpecificationSize(specificationContent);
+    } catch (error) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          error: 'Specification too large',
+          details: error instanceof Error ? error.message : 'Unknown error',
+        }),
+      };
+    }
+
     let tokensUsed = 0;
 
     // Step 1: Parse Specification
     console.log('Step 1: Parsing specification...');
     const parseResult = await parseSpecification(specificationContent, language);
-    pipelineState.parseSpecification = parseResult;
-    tokensUsed += parseResult.tokensUsed || 0;
+    tokensUsed += parseResult.tokensUsed;
 
     // Step 2: Identify Components
     console.log('Step 2: Identifying components...');
     const componentsResult = await identifyComponents(parseResult.parsed, projectContext, language);
-    pipelineState.identifyComponents = componentsResult;
-    tokensUsed += componentsResult.tokensUsed || 0;
+    tokensUsed += componentsResult.tokensUsed;
 
-    // Step 3: Generate Tickets (using Sonnet for efficiency)
+    // Step 3: Generate Tickets
     console.log('Step 3: Generating tickets...');
-    const ticketsResult = await generateTickets(componentsResult.components, parseResult.parsed, language);
-    pipelineState.generateTickets = ticketsResult.tickets;
-    tokensUsed += ticketsResult.tokensUsed || 0;
+    const ticketsResult = await generateTickets(
+      componentsResult.components,
+      parseResult.parsed,
+      language
+    );
+    tokensUsed += ticketsResult.tokensUsed;
 
     // Step 4: Analyze Dependencies
     console.log('Step 4: Analyzing dependencies...');
     const dependenciesResult = await analyzeDependencies(ticketsResult.tickets, language);
-    pipelineState.analyzeDependencies = dependenciesResult;
-    tokensUsed += dependenciesResult.tokensUsed || 0;
+    tokensUsed += dependenciesResult.tokensUsed;
 
     // Step 5: Optimize Parallelization
     console.log('Step 5: Optimizing parallelization...');
     const parallelizationResult = await optimizeParallelization(
       dependenciesResult.enhancedTickets,
-      projectContext,
       language
     );
-    pipelineState.optimizeParallelization = parallelizationResult;
-    tokensUsed += parallelizationResult.tokensUsed || 0;
+    tokensUsed += parallelizationResult.tokensUsed;
 
     // Step 6: Generate Documents
     console.log('Step 6: Generating documents...');
@@ -111,14 +108,12 @@ export const handler = async (event: any) => {
       parallelizationResult.executionTracks,
       language
     );
-    pipelineState.generateDocuments = documentsResult;
-    tokensUsed += documentsResult.tokensUsed || 0;
+    tokensUsed += documentsResult.tokensUsed;
 
-    // Calculate estimated cost (approximate pricing for Claude)
-    // Claude 3 Opus: $15 per million input tokens, $75 per million output tokens
-    // Claude 3 Sonnet: $3 per million input tokens, $15 per million output tokens
-    // Simplified: average $10 per million tokens
+    // Calculate cost (simplified: $10 per million tokens)
     const totalCost = (tokensUsed / 1000000) * 10;
+
+    console.log(`Ticket generation completed. Tokens: ${tokensUsed}, Cost: $${totalCost.toFixed(2)}`);
 
     return {
       statusCode: 200,
@@ -131,7 +126,6 @@ export const handler = async (event: any) => {
         tickets: parallelizationResult.finalTickets,
         summaryPath: documentsResult.summaryPath,
         executionPlanPath: documentsResult.executionPlanPath,
-        intermediateResults: pipelineState,
         tokensUsed,
         totalCost,
         timestamp: new Date().toISOString(),
@@ -153,334 +147,115 @@ export const handler = async (event: any) => {
   }
 };
 
-/**
- * Step 1: Parse Specification
- * Extracts key information from the specification
- */
 async function parseSpecification(content: string, language: string) {
-  const systemPrompt = language === 'pt-BR'
-    ? `Você é um analisador de especificações técnicas. Analise a especificação fornecida e extraia:
-- Objetivo principal do projeto
-- Requisitos funcionais
-- Requisitos não-funcionais
-- Componentes identificados
-- Restrições técnicas
-- Critérios de sucesso
+  const systemPrompt =
+    language === 'pt-BR'
+      ? `Analise a especificação e extraia em JSON: objetivo, requisitos funcionais, requisitos não-funcionais, componentes, restrições técnicas, critérios de sucesso.`
+      : `Analyze the specification and extract as JSON: objective, functional requirements, non-functional requirements, components, technical constraints, success criteria.`;
 
-Forneça a resposta em JSON estruturado.`
-    : `You are a technical specification analyzer. Analyze the provided specification and extract:
-- Main project objective
-- Functional requirements
-- Non-functional requirements
-- Identified components
-- Technical constraints
-- Success criteria
-
-Provide the response in structured JSON.`;
-
-  const command = new ConverseCommand({
+  const result = await callBedrockWithRetry({
     modelId: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
-    messages: [
-      {
-        role: 'user',
-        content: [{ text: `${systemPrompt}\n\nEspecificação:\n${content}` }],
-      },
-    ],
-    inferenceConfig: {
-      maxTokens: 4096,
-      temperature: 0.3,
-    },
+    messages: [{ role: 'user', content: [{ text: `${systemPrompt}\n\n${content}` }] }],
+    temperature: 0.3,
   });
 
-  const response: ConverseCommandOutput = await bedrockClient.send(command);
-  const text = response.output?.message?.content?.[0]?.text || '{}';
-  
-  // Extract JSON from markdown code blocks if present
-  const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/) || text.match(/```\s*([\s\S]*?)\s*```/);
-  const jsonText = jsonMatch ? jsonMatch[1] : text;
-
-  return {
-    parsed: JSON.parse(jsonText),
-    tokensUsed: (response.usage?.inputTokens || 0) + (response.usage?.outputTokens || 0),
-  };
+  return { parsed: extractJSON(result.response), tokensUsed: result.tokensUsed };
 }
 
-/**
- * Step 2: Identify Components
- * Breaks down the specification into implementable components
- */
 async function identifyComponents(parsedSpec: any, projectContext: any, language: string) {
   const contextInfo = projectContext
-    ? `\n\nContexto do Projeto:\n- Tech Stack: ${JSON.stringify(projectContext.techStack || {})}\n- Padrões: ${JSON.stringify(projectContext.patterns || {})}`
+    ? `\nContexto: ${JSON.stringify(projectContext.techStack || {})}`
     : '';
 
-  const systemPrompt = language === 'pt-BR'
-    ? `Você é um arquiteto de software especializado em quebrar projetos em componentes implementáveis.
+  const systemPrompt =
+    language === 'pt-BR'
+      ? `Identifique componentes implementáveis em 1-3 dias. Retorne JSON: { "components": [{ "name", "description", "estimatedDays", "dependencies": [] }] }${contextInfo}`
+      : `Identify components implementable in 1-3 days. Return JSON: { "components": [{ "name", "description", "estimatedDays", "dependencies": [] }] }${contextInfo}`;
 
-Analise os requisitos e identifique componentes lógicos que podem ser implementados em 1-3 dias cada.
-Considere:
-- Separação de responsabilidades
-- Dependências entre componentes
-- Complexidade técnica
-- Capacidade de paralelização
-
-Forneça uma lista de componentes em JSON: { "components": [{ "name": string, "description": string, "estimatedDays": number, "dependencies": string[] }] }${contextInfo}`
-    : `You are a software architect specialized in breaking projects into implementable components.
-
-Analyze the requirements and identify logical components that can be implemented in 1-3 days each.
-Consider:
-- Separation of concerns
-- Dependencies between components
-- Technical complexity
-- Parallelization capability
-
-Provide a list of components in JSON: { "components": [{ "name": string, "description": string, "estimatedDays": number, "dependencies": string[] }] }${contextInfo}`;
-
-  const command = new ConverseCommand({
+  const result = await callBedrockWithRetry({
     modelId: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
-    messages: [
-      {
-        role: 'user',
-        content: [{ text: `${systemPrompt}\n\nRequisitos:\n${JSON.stringify(parsedSpec, null, 2)}` }],
-      },
-    ],
-    inferenceConfig: {
-      maxTokens: 4096,
-      temperature: 0.4,
-    },
+    messages: [{ role: 'user', content: [{ text: `${systemPrompt}\n\n${JSON.stringify(parsedSpec)}` }] }],
+    temperature: 0.4,
   });
 
-  const response: ConverseCommandOutput = await bedrockClient.send(command);
-  const text = response.output?.message?.content?.[0]?.text || '{}';
-  
-  const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/) || text.match(/```\s*([\s\S]*?)\s*```/);
-  const jsonText = jsonMatch ? jsonMatch[1] : text;
-
-  return {
-    components: JSON.parse(jsonText).components || [],
-    tokensUsed: (response.usage?.inputTokens || 0) + (response.usage?.outputTokens || 0),
-  };
+  return { components: extractJSON(result.response).components || [], tokensUsed: result.tokensUsed };
 }
 
-/**
- * Step 3: Generate Tickets
- * Creates detailed tickets from components
- */
 async function generateTickets(components: any[], parsedSpec: any, language: string) {
   const tickets: GeneratedTicket[] = [];
   let totalTokens = 0;
 
-  // Generate tickets in batches to avoid context overflow
   const batchSize = 5;
   for (let i = 0; i < components.length; i += batchSize) {
     const batch = components.slice(i, i + batchSize);
 
-    const systemPrompt = language === 'pt-BR'
-      ? `Você é um gerente de projeto especializado em criar tickets de desenvolvimento detalhados.
+    const systemPrompt =
+      language === 'pt-BR'
+        ? `Crie tickets detalhados para cada componente com: title, description, acceptanceCriteria[], estimatedHours (8-72h), complexity (simple/medium/complex), dependencies[], parallelizable, aiAgentCapable, requiredExpertise[], testingStrategy, rollbackPlan. JSON: { "tickets": [GeneratedTicket] }`
+        : `Create detailed tickets for each component with: title, description, acceptanceCriteria[], estimatedHours (8-72h), complexity (simple/medium/complex), dependencies[], parallelizable, aiAgentCapable, requiredExpertise[], testingStrategy, rollbackPlan. JSON: { "tickets": [GeneratedTicket] }`;
 
-Para cada componente, crie um ticket com:
-- title: Título claro e conciso
-- description: Descrição detalhada do trabalho
-- acceptanceCriteria: Lista de critérios de aceitação verificáveis
-- estimatedHours: Estimativa em horas (8-24 horas por dia, máximo 3 dias = 72 horas)
-- complexity: "simple", "medium" ou "complex"
-- dependencies: IDs de outros tickets (use o nome do componente como ID temporário)
-- parallelizable: true se pode ser feito em paralelo com outros tickets
-- aiAgentCapable: true se um agente AI (como Claude Code) pode implementar
-- requiredExpertise: Lista de conhecimentos necessários
-- testingStrategy: Estratégia de teste para este ticket
-- rollbackPlan: Plano de rollback caso algo dê errado
-
-Responda em JSON: { "tickets": [GeneratedTicket] }`
-      : `You are a project manager specialized in creating detailed development tickets.
-
-For each component, create a ticket with:
-- title: Clear and concise title
-- description: Detailed description of the work
-- acceptanceCriteria: List of verifiable acceptance criteria
-- estimatedHours: Estimate in hours (8-24 hours per day, maximum 3 days = 72 hours)
-- complexity: "simple", "medium" or "complex"
-- dependencies: IDs of other tickets (use component name as temporary ID)
-- parallelizable: true if can be done in parallel with other tickets
-- aiAgentCapable: true if an AI agent (like Claude Code) can implement
-- requiredExpertise: List of required knowledge
-- testingStrategy: Testing strategy for this ticket
-- rollbackPlan: Rollback plan if something goes wrong
-
-Respond in JSON: { "tickets": [GeneratedTicket] }`;
-
-    const command = new ConverseCommand({
+    const result = await callBedrockWithRetry({
       modelId: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
       messages: [
         {
           role: 'user',
-          content: [
-            {
-              text: `${systemPrompt}\n\nComponentes:\n${JSON.stringify(batch, null, 2)}\n\nContexto da Especificação:\n${JSON.stringify(parsedSpec, null, 2)}`,
-            },
-          ],
+          content: [{ text: `${systemPrompt}\n\nComponentes: ${JSON.stringify(batch)}` }],
         },
       ],
-      inferenceConfig: {
-        maxTokens: 4096,
-        temperature: 0.5,
-      },
+      temperature: 0.5,
     });
 
-    const response: ConverseCommandOutput = await bedrockClient.send(command);
-    const text = response.output?.message?.content?.[0]?.text || '{}';
-    
-    const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/) || text.match(/```\s*([\s\S]*?)\s*```/);
-    const jsonText = jsonMatch ? jsonMatch[1] : text;
-
-    const batchTickets = JSON.parse(jsonText).tickets || [];
+    const batchTickets = extractJSON(result.response).tickets || [];
     tickets.push(...batchTickets);
-    totalTokens += (response.usage?.inputTokens || 0) + (response.usage?.outputTokens || 0);
+    totalTokens += result.tokensUsed;
   }
 
-  return {
-    tickets,
-    tokensUsed: totalTokens,
-  };
+  return { tickets, tokensUsed: totalTokens };
 }
 
-/**
- * Step 4: Analyze Dependencies
- * Analyzes and validates ticket dependencies
- */
 async function analyzeDependencies(tickets: GeneratedTicket[], language: string) {
-  const systemPrompt = language === 'pt-BR'
-    ? `Você é um analista de dependências de projetos. 
+  const systemPrompt =
+    language === 'pt-BR'
+      ? `Analise dependências dos tickets. Retorne JSON: { "dependencyGraph": { "nodes": [], "edges": [] }, "criticalPath": [], "enhancedTickets": [], "warnings": [] }`
+      : `Analyze ticket dependencies. Return JSON: { "dependencyGraph": { "nodes": [], "edges": [] }, "criticalPath": [], "enhancedTickets": [], "warnings": [] }`;
 
-Analise os tickets fornecidos e:
-1. Valide as dependências existentes
-2. Identifique dependências implícitas não mencionadas
-3. Crie um grafo de dependências
-4. Identifique o caminho crítico
-5. Sugira otimizações
-
-Responda em JSON: { 
-  "dependencyGraph": { "nodes": [], "edges": [] },
-  "criticalPath": string[],
-  "enhancedTickets": GeneratedTicket[],
-  "warnings": string[]
-}`
-    : `You are a project dependency analyst.
-
-Analyze the provided tickets and:
-1. Validate existing dependencies
-2. Identify implicit dependencies not mentioned
-3. Create a dependency graph
-4. Identify the critical path
-5. Suggest optimizations
-
-Respond in JSON: { 
-  "dependencyGraph": { "nodes": [], "edges": [] },
-  "criticalPath": string[],
-  "enhancedTickets": GeneratedTicket[],
-  "warnings": string[]
-}`;
-
-  const command = new ConverseCommand({
+  const result = await callBedrockWithRetry({
     modelId: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
-    messages: [
-      {
-        role: 'user',
-        content: [{ text: `${systemPrompt}\n\nTickets:\n${JSON.stringify(tickets, null, 2)}` }],
-      },
-    ],
-    inferenceConfig: {
-      maxTokens: 4096,
-      temperature: 0.3,
-    },
+    messages: [{ role: 'user', content: [{ text: `${systemPrompt}\n\n${JSON.stringify(tickets)}` }] }],
+    temperature: 0.3,
   });
 
-  const response: ConverseCommandOutput = await bedrockClient.send(command);
-  const text = response.output?.message?.content?.[0]?.text || '{}';
-  
-  const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/) || text.match(/```\s*([\s\S]*?)\s*```/);
-  const jsonText = jsonMatch ? jsonMatch[1] : text;
-
-  const result = JSON.parse(jsonText);
-
+  const parsed = extractJSON(result.response);
   return {
-    dependencyGraph: result.dependencyGraph || { nodes: [], edges: [] },
-    criticalPath: result.criticalPath || [],
-    enhancedTickets: result.enhancedTickets || tickets,
-    warnings: result.warnings || [],
-    tokensUsed: (response.usage?.inputTokens || 0) + (response.usage?.outputTokens || 0),
+    dependencyGraph: parsed.dependencyGraph || { nodes: [], edges: [] },
+    criticalPath: parsed.criticalPath || [],
+    enhancedTickets: parsed.enhancedTickets || tickets,
+    warnings: parsed.warnings || [],
+    tokensUsed: result.tokensUsed,
   };
 }
 
-/**
- * Step 5: Optimize Parallelization
- * Optimizes ticket execution for AI agents working in parallel
- */
-async function optimizeParallelization(tickets: GeneratedTicket[], projectContext: any, language: string) {
-  const systemPrompt = language === 'pt-BR'
-    ? `Você é um especialista em otimização de execução paralela para agentes de IA.
+async function optimizeParallelization(tickets: GeneratedTicket[], language: string) {
+  const systemPrompt =
+    language === 'pt-BR'
+      ? `Otimize execução paralela para agentes AI. Retorne JSON: { "executionTracks": [{ "trackId", "tickets": [], "estimatedDays" }], "finalTickets": [], "recommendations": [] }`
+      : `Optimize parallel execution for AI agents. Return JSON: { "executionTracks": [{ "trackId", "tickets": [], "estimatedDays" }], "finalTickets": [], "recommendations": [] }`;
 
-Analise os tickets e crie trilhas de execução paralela considerando:
-1. Tickets que podem ser executados simultaneamente por diferentes agentes AI
-2. Dependências que impedem paralelização
-3. Balanceamento de carga entre agentes
-4. Pontos de sincronização necessários
-5. Capacidade de cada ticket ser implementado por IA
-
-Responda em JSON: {
-  "executionTracks": [{ "trackId": number, "tickets": string[], "estimatedDays": number }],
-  "finalTickets": GeneratedTicket[],
-  "recommendations": string[]
-}`
-    : `You are an expert in parallel execution optimization for AI agents.
-
-Analyze the tickets and create parallel execution tracks considering:
-1. Tickets that can be executed simultaneously by different AI agents
-2. Dependencies that prevent parallelization
-3. Load balancing between agents
-4. Necessary synchronization points
-5. Capability of each ticket to be implemented by AI
-
-Respond in JSON: {
-  "executionTracks": [{ "trackId": number, "tickets": string[], "estimatedDays": number }],
-  "finalTickets": GeneratedTicket[],
-  "recommendations": string[]
-}`;
-
-  const command = new ConverseCommand({
-    modelId: 'anthropic.claude-3-opus-20240229-v1:0', // Use Opus for complex planning
-    messages: [
-      {
-        role: 'user',
-        content: [{ text: `${systemPrompt}\n\nTickets:\n${JSON.stringify(tickets, null, 2)}` }],
-      },
-    ],
-    inferenceConfig: {
-      maxTokens: 4096,
-      temperature: 0.4,
-    },
+  const result = await callBedrockWithRetry({
+    modelId: 'anthropic.claude-3-opus-20240229-v1:0',
+    messages: [{ role: 'user', content: [{ text: `${systemPrompt}\n\n${JSON.stringify(tickets)}` }] }],
+    temperature: 0.4,
   });
 
-  const response: ConverseCommandOutput = await bedrockClient.send(command);
-  const text = response.output?.message?.content?.[0]?.text || '{}';
-  
-  const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/) || text.match(/```\s*([\s\S]*?)\s*```/);
-  const jsonText = jsonMatch ? jsonMatch[1] : text;
-
-  const result = JSON.parse(jsonText);
-
+  const parsed = extractJSON(result.response);
   return {
-    executionTracks: result.executionTracks || [],
-    finalTickets: result.finalTickets || tickets,
-    recommendations: result.recommendations || [],
-    tokensUsed: (response.usage?.inputTokens || 0) + (response.usage?.outputTokens || 0),
+    executionTracks: parsed.executionTracks || [],
+    finalTickets: parsed.finalTickets || tickets,
+    recommendations: parsed.recommendations || [],
+    tokensUsed: result.tokensUsed,
   };
 }
 
-/**
- * Step 6: Generate Documents
- * Creates SUMMARY.md and EXECUTION_PLAN.md
- */
 async function generateDocuments(
   specificationId: string,
   tickets: GeneratedTicket[],
@@ -492,136 +267,34 @@ async function generateDocuments(
   let totalTokens = 0;
 
   // Generate SUMMARY.md
-  const summaryPrompt = language === 'pt-BR'
-    ? `Você é um gerente de projetos técnico criando um resumo executivo.
+  const summaryPrompt =
+    language === 'pt-BR'
+      ? `Crie SUMMARY.md em português com: Resumo Executivo (2-3 parágrafos), Breakdown de Tickets (total, por complexidade), Caminho Crítico, Matriz de Risco, Requisitos de Recursos, Estimativa de Timeline.\n\nDados: ${JSON.stringify({ tickets, parsedSpec }, null, 2)}`
+      : `Create SUMMARY.md in Portuguese with: Executive Summary (2-3 paragraphs), Ticket Breakdown (total, by complexity), Critical Path, Risk Matrix, Resource Requirements, Timeline Estimate.\n\nData: ${JSON.stringify({ tickets, parsedSpec }, null, 2)}`;
 
-Crie um documento SUMMARY.md em português (pt-BR) com:
-
-# Resumo Executivo
-
-## Visão Geral
-(2-3 parágrafos explicando o projeto e objetivos)
-
-## Breakdown de Tickets
-- Total de tickets: X
-- Por complexidade: X simples, Y médios, Z complexos
-- Por tipo: ...
-
-## Caminho Crítico
-(Liste os tickets no caminho crítico)
-
-## Matriz de Risco
-| Risco | Probabilidade | Impacto | Mitigação |
-|-------|---------------|---------|-----------|
-| ...   | ...           | ...     | ...       |
-
-## Requisitos de Recursos
-- Desenvolvedores necessários: X
-- Agentes AI necessários: Y
-- Especialidades requeridas: ...
-
-## Estimativa de Timeline
-- Duração total (sequencial): X dias
-- Duração total (paralelo): Y dias
-- Nível de confiança: Z%
-
-Dados dos tickets:
-${JSON.stringify({ tickets, parsedSpec, dependencyGraph, executionTracks }, null, 2)}`
-    : `You are a technical project manager creating an executive summary.
-
-Create a SUMMARY.md document in Portuguese (pt-BR) with:
-[... similar structure ...]
-
-Ticket data:
-${JSON.stringify({ tickets, parsedSpec, dependencyGraph, executionTracks }, null, 2)}`;
-
-  const summaryCommand = new ConverseCommand({
+  const summaryResult = await callBedrockWithRetry({
     modelId: 'anthropic.claude-3-opus-20240229-v1:0',
-    messages: [
-      {
-        role: 'user',
-        content: [{ text: summaryPrompt }],
-      },
-    ],
-    inferenceConfig: {
-      maxTokens: 4096,
-      temperature: 0.5,
-    },
+    messages: [{ role: 'user', content: [{ text: summaryPrompt }] }],
+    temperature: 0.5,
+    maxTokens: 4096,
   });
-
-  const summaryResponse: ConverseCommandOutput = await bedrockClient.send(summaryCommand);
-  const summaryContent = summaryResponse.output?.message?.content?.[0]?.text || '';
-  totalTokens += (summaryResponse.usage?.inputTokens || 0) + (summaryResponse.usage?.outputTokens || 0);
+  totalTokens += summaryResult.tokensUsed;
 
   // Generate EXECUTION_PLAN.md
-  const executionPrompt = language === 'pt-BR'
-    ? `Você é um arquiteto de software criando um plano de execução detalhado.
+  const executionPrompt =
+    language === 'pt-BR'
+      ? `Crie EXECUTION_PLAN.md em português com: Trilhas de Execução Paralela, Dependências Sequenciais, Recomendações de Agentes, Pontos de Integração, Checkpoints de Teste, Estratégias de Rollback.\n\nDados: ${JSON.stringify({ tickets, executionTracks }, null, 2)}`
+      : `Create EXECUTION_PLAN.md in Portuguese with: Parallel Execution Tracks, Sequential Dependencies, Agent Recommendations, Integration Points, Test Checkpoints, Rollback Strategies.\n\nData: ${JSON.stringify({ tickets, executionTracks }, null, 2)}`;
 
-Crie um documento EXECUTION_PLAN.md em português (pt-BR) com:
-
-# Plano de Execução
-
-## Trilhas de Execução Paralela
-
-### Trilha 1: [Nome]
-- Tickets: [lista]
-- Duração estimada: X dias
-- Agente recomendado: [tipo]
-
-(Repita para cada trilha)
-
-## Dependências Sequenciais
-[Mapeamento visual de dependências]
-
-## Recomendações de Atribuição de Agentes
-| Ticket | Agente Recomendado | Motivo |
-|--------|-------------------|--------|
-| ...    | ...               | ...    |
-
-## Pontos de Integração e Sincronização
-[Liste pontos onde as trilhas precisam sincronizar]
-
-## Checkpoints de Teste e Validação
-| Fase | Tickets Incluídos | Critérios de Sucesso |
-|------|------------------|---------------------|
-| ...  | ...              | ...                 |
-
-## Estratégias de Rollback por Fase
-### Fase 1
-- Tickets: ...
-- Rollback: ...
-
-(Repita para cada fase)
-
-Dados:
-${JSON.stringify({ tickets, executionTracks, dependencyGraph }, null, 2)}`
-    : `You are a software architect creating a detailed execution plan.
-
-Create an EXECUTION_PLAN.md document in Portuguese (pt-BR) with:
-[... similar structure ...]
-
-Data:
-${JSON.stringify({ tickets, executionTracks, dependencyGraph }, null, 2)}`;
-
-  const executionCommand = new ConverseCommand({
+  const executionResult = await callBedrockWithRetry({
     modelId: 'anthropic.claude-3-opus-20240229-v1:0',
-    messages: [
-      {
-        role: 'user',
-        content: [{ text: executionPrompt }],
-      },
-    ],
-    inferenceConfig: {
-      maxTokens: 4096,
-      temperature: 0.5,
-    },
+    messages: [{ role: 'user', content: [{ text: executionPrompt }] }],
+    temperature: 0.5,
+    maxTokens: 4096,
   });
+  totalTokens += executionResult.tokensUsed;
 
-  const executionResponse: ConverseCommandOutput = await bedrockClient.send(executionCommand);
-  const executionContent = executionResponse.output?.message?.content?.[0]?.text || '';
-  totalTokens += (executionResponse.usage?.inputTokens || 0) + (executionResponse.usage?.outputTokens || 0);
-
-  // Save documents to S3
+  // Save to S3
   const summaryKey = `specs/${specificationId}/SUMMARY.md`;
   const executionKey = `specs/${specificationId}/EXECUTION_PLAN.md`;
 
@@ -629,7 +302,7 @@ ${JSON.stringify({ tickets, executionTracks, dependencyGraph }, null, 2)}`;
     new PutObjectCommand({
       Bucket: BUCKET_NAME,
       Key: summaryKey,
-      Body: summaryContent,
+      Body: summaryResult.response,
       ContentType: 'text/markdown',
     })
   );
@@ -638,7 +311,7 @@ ${JSON.stringify({ tickets, executionTracks, dependencyGraph }, null, 2)}`;
     new PutObjectCommand({
       Bucket: BUCKET_NAME,
       Key: executionKey,
-      Body: executionContent,
+      Body: executionResult.response,
       ContentType: 'text/markdown',
     })
   );
@@ -648,7 +321,7 @@ ${JSON.stringify({ tickets, executionTracks, dependencyGraph }, null, 2)}`;
     const ticket = tickets[i];
     const ticketNumber = String(i + 1).padStart(3, '0');
     const ticketKey = `specs/${specificationId}/tickets/TICKET-${ticketNumber}.md`;
-    
+
     const ticketContent = `# ${ticket.title}
 
 ## Descrição
@@ -664,10 +337,10 @@ ${ticket.acceptanceCriteria.map((c, idx) => `${idx + 1}. ${c}`).join('\n')}
 - **Implementável por IA**: ${ticket.aiAgentCapable ? 'Sim' : 'Não'}
 
 ## Dependências
-${ticket.dependencies.length > 0 ? ticket.dependencies.map(d => `- ${d}`).join('\n') : 'Nenhuma'}
+${ticket.dependencies.length > 0 ? ticket.dependencies.map((d) => `- ${d}`).join('\n') : 'Nenhuma'}
 
 ## Expertise Necessária
-${ticket.requiredExpertise.map(e => `- ${e}`).join('\n')}
+${ticket.requiredExpertise.map((e) => `- ${e}`).join('\n')}
 
 ## Estratégia de Teste
 ${ticket.testingStrategy}
@@ -686,9 +359,5 @@ ${ticket.rollbackPlan}
     );
   }
 
-  return {
-    summaryPath: summaryKey,
-    executionPlanPath: executionKey,
-    tokensUsed: totalTokens,
-  };
+  return { summaryPath: summaryKey, executionPlanPath: executionKey, tokensUsed: totalTokens };
 }

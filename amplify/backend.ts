@@ -157,11 +157,8 @@ const ticketGenerationPolicy = new Policy(
 
 backend.ticketGeneration.resources.lambda.role?.attachInlinePolicy(ticketGenerationPolicy);
 
-// Add environment variables to ticket generation function
-backend.ticketGeneration.resources.lambda.addEnvironment(
-  'STORAGE_BUCKET_NAME',
-  backend.storage.resources.bucket.bucketName
-);
+// Note: Environment variables should be configured in the Lambda console
+// or through the defineFunction environment property after deployment
 
 // Add ticket generation URL to outputs
 backend.addOutput({
