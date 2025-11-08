@@ -68,7 +68,7 @@ export async function OPTIONS() {
 /**
  * Mock responses for development
  */
-function getMockResponse(operation: string, body: any) {
+function getMockResponse(operation: string, body: Record<string, unknown>) {
   switch (operation) {
     case 'connect':
       return NextResponse.json({

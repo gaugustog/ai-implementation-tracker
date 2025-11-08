@@ -76,7 +76,7 @@ export async function OPTIONS() {
 /**
  * Handle push events - trigger repository sync
  */
-async function handlePushEvent(payload: any) {
+async function handlePushEvent(payload: Record<string, unknown>) {
   const repoFullName = payload.repository?.full_name;
   const branch = payload.ref?.replace('refs/heads/', '');
   const commitSha = payload.after;
@@ -105,7 +105,7 @@ async function handlePushEvent(payload: any) {
 /**
  * Handle pull request events
  */
-async function handlePullRequestEvent(payload: any) {
+async function handlePullRequestEvent(payload: Record<string, unknown>) {
   const action = payload.action;
   const prNumber = payload.pull_request?.number;
   const repoFullName = payload.repository?.full_name;

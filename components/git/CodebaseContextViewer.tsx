@@ -39,7 +39,7 @@ interface CodebaseContextViewerProps {
       testingStrategy: string;
     };
     integrationPoints?: Array<{ file: string; purpose: string }>;
-    fileStructure?: any;
+    fileStructure?: Record<string, unknown>;
     metrics?: {
       totalFiles: number;
       languageBreakdown: Record<string, number>;
@@ -51,7 +51,7 @@ interface CodebaseContextViewerProps {
 export function CodebaseContextViewer({ context, lastAnalyzedAt }: CodebaseContextViewerProps) {
   const [expanded, setExpanded] = useState<string | false>('techStack');
 
-  const handleChange = (panel: string) => (_: any, isExpanded: boolean) => {
+  const handleChange = (panel: string) => (_: React.SyntheticEvent, isExpanded: boolean) => {
     setExpanded(isExpanded ? panel : false);
   };
 
