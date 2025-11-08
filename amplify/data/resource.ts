@@ -25,17 +25,54 @@ const schema = a.schema({
     })
     .authorization((allow) => [allow.publicApiKey()]),
 
+  Epic: a
+    .model({
+      title: a.string().required(),
+      epicNumber: a.integer().required(),
+      description: a.string(),
+      specificationId: a.id().required(),
+      specification: a.belongsTo('Specification', 'specificationId'),
+      tickets: a.hasMany('Ticket', 'epicNumber'),
+      createdAt: a.datetime(),
+      updatedAt: a.datetime(),
+    })
+    .authorization((allow) => [allow.publicApiKey()]),
+
   Ticket: a
     .model({
       title: a.string().required(),
+      ticketNumber: a.integer().required(),
+      epicNumber: a.integer(),
       description: a.string(),
+      s3MdFileObjectKey: a.string(), // S3 file key for markdown file
+      acceptanceCriteria: a.string().array(), // Array of strings
+      estimatedMinutes: a.integer(),
+      complexity: a.enum(['simple', 'medium', 'complex']),
+      parallelizable: a.boolean().default(false),
+      aiAgentCapable: a.boolean().default(false), // Can be implemented by AI coding agent
+      requiredExpertise: a.string().array(), // Array of strings
+      testingStrategy: a.string(),
+      rollbackPlan: a.string(),
       status: a.enum(['todo', 'in_progress', 'done']),
       specType: a.enum(['ANALYSIS', 'FIXES', 'PLANS', 'REVIEWS']),
       fileKey: a.string(), // S3 file key for markdown file
       specificationId: a.id(),
       specification: a.belongsTo('Specification', 'specificationId'),
+      dependencies: a.hasMany('TicketDependency', 'ticketId'), // Tickets this ticket depends on
+      dependentTickets: a.hasMany('TicketDependency', 'dependsOnId'), // Tickets that depend on this one
       createdAt: a.datetime(),
       updatedAt: a.datetime(),
+    })
+    .authorization((allow) => [allow.publicApiKey()]),
+
+  TicketDependency: a
+    .model({
+      ticketId: a.id().required(),
+      ticket: a.belongsTo('Ticket', 'ticketId'),
+      dependsOnId: a.id().required(),
+      dependsOn: a.belongsTo('Ticket', 'dependsOnId'),
+      dependencyType: a.enum(['blocks', 'requires', 'relates_to']).default('blocks'),
+      createdAt: a.datetime(),
     })
     .authorization((allow) => [allow.publicApiKey()]),
 
