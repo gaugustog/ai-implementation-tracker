@@ -227,7 +227,7 @@ export const ticketAPI = {
   create: async (ticket: {
     title: string;
     description?: string;
-    status: 'todo' | 'in-progress' | 'done';
+    status: 'todo' | 'in_progress' | 'done';
     specType: 'ANALYSIS' | 'FIXES' | 'PLANS' | 'REVIEWS';
     fileKey?: string;
     specificationId?: string;
@@ -279,7 +279,7 @@ export const ticketAPI = {
     updates: Partial<{
       title: string;
       description: string;
-      status: 'todo' | 'in-progress' | 'done';
+      status: 'todo' | 'in_progress' | 'done';
       fileKey: string;
     }>
   ) => {

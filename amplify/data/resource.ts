@@ -28,7 +28,7 @@ const schema = a.schema({
     .model({
       title: a.string().required(),
       description: a.string(),
-      status: a.enum(['todo', 'in-progress', 'done']),
+      status: a.enum(['todo', 'in_progress', 'done']),
       specType: a.enum(['ANALYSIS', 'FIXES', 'PLANS', 'REVIEWS']),
       fileKey: a.string(), // S3 file key for markdown file
       specificationId: a.id(),

@@ -4,7 +4,7 @@ export interface Ticket {
   id: string;
   title: string;
   description?: string | null;
-  status?: 'todo' | 'in-progress' | 'done' | null;
+  status?: 'todo' | 'in_progress' | 'done' | null;
   specType?: SpecType | null;
   fileKey?: string | null; // S3 file key for markdown file
   specificationId?: string | null;

@@ -22,7 +22,7 @@ import { ticketAPI } from '@/lib/api/amplify';
 
 export default function TicketsPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'todo' | 'in-progress' | 'done'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'todo' | 'in_progress' | 'done'>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,7 +52,7 @@ export default function TicketsPage() {
     switch (status) {
       case 'todo':
         return <Circle size={16} />;
-      case 'in-progress':
+      case 'in_progress':
         return <Clock size={16} />;
       case 'done':
         return <CheckCircle2 size={16} />;
@@ -63,7 +63,7 @@ export default function TicketsPage() {
     switch (status) {
       case 'todo':
         return 'rgb(161 161 170)';
-      case 'in-progress':
+      case 'in_progress':
         return 'rgb(59 130 246)';
       case 'done':
         return 'rgb(34 197 94)';
@@ -103,7 +103,7 @@ export default function TicketsPage() {
             <Select
               value={statusFilter}
               label="Status"
-              onChange={(e) => setStatusFilter(e.target.value as 'all' | 'todo' | 'in-progress' | 'done')}
+              onChange={(e) => setStatusFilter(e.target.value as 'all' | 'todo' | 'in_progress' | 'done')}
               sx={{
                 color: 'rgb(250 250 250)',
                 '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgb(63 63 70)' },
@@ -113,7 +113,7 @@ export default function TicketsPage() {
             >
               <MenuItem value="all">All</MenuItem>
               <MenuItem value="todo">To Do</MenuItem>
-              <MenuItem value="in-progress">In Progress</MenuItem>
+              <MenuItem value="in_progress">In Progress</MenuItem>
               <MenuItem value="done">Done</MenuItem>
             </Select>
           </FormControl>
@@ -168,7 +168,7 @@ export default function TicketsPage() {
                 In Progress
               </Typography>
               <Typography variant="h4" sx={{ fontWeight: 700, color: 'rgb(59 130 246)' }}>
-                {tickets.filter(t => t.status === 'in-progress').length}
+                {tickets.filter(t => t.status === 'in_progress').length}
               </Typography>
             </CardContent>
           </Card>
