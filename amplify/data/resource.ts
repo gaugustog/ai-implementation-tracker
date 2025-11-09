@@ -8,7 +8,9 @@ const schema = a.schema({
       createdAt: a.datetime(),
       updatedAt: a.datetime(),
       specifications: a.hasMany('Specification', 'projectId'),
+      specificationDrafts: a.hasMany('SpecificationDraft', 'projectId'),
       gitRepository: a.hasOne('GitRepository', 'projectId'),
+      projectContext: a.hasOne('ProjectContext', 'projectId'),
     })
     .authorization((allow) => [allow.publicApiKey()]),
 
@@ -19,6 +21,7 @@ const schema = a.schema({
       fileKey: a.string(), // S3 file key for markdown file
       projectId: a.id().required(),
       project: a.belongsTo('Project', 'projectId'),
+      epics: a.hasMany('Epic', 'specificationId'),
       tickets: a.hasMany('Ticket', 'specificationId'),
       createdAt: a.datetime(),
       updatedAt: a.datetime(),
@@ -32,7 +35,7 @@ const schema = a.schema({
       description: a.string(),
       specificationId: a.id().required(),
       specification: a.belongsTo('Specification', 'specificationId'),
-      tickets: a.hasMany('Ticket', 'epicNumber'),
+      tickets: a.hasMany('Ticket', 'epicId'),
       createdAt: a.datetime(),
       updatedAt: a.datetime(),
     })
@@ -43,6 +46,8 @@ const schema = a.schema({
       title: a.string().required(),
       ticketNumber: a.integer().required(),
       epicNumber: a.integer(),
+      epicId: a.id(),
+      epic: a.belongsTo('Epic', 'epicId'),
       description: a.string(),
       s3MdFileObjectKey: a.string(), // S3 file key for markdown file
       acceptanceCriteria: a.string().array(), // Array of strings

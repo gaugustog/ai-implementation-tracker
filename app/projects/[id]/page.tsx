@@ -12,8 +12,10 @@ import {
   Button,
   CircularProgress,
   Alert,
+  TextField,
+  Stack,
 } from '@mui/material';
-import { ArrowBack, Code, Description } from '@mui/icons-material';
+import { ArrowBack, Code, Description, Edit } from '@mui/icons-material';
 import { GitIntegrationPanel } from '@/components/git/GitIntegrationPanel';
 import { CodebaseContextViewer } from '@/components/git/CodebaseContextViewer';
 import type { Project } from '@/lib/types';
@@ -50,6 +52,12 @@ export default function ProjectDetailPage() {
   } | null>(null);
   const [contextLoading, setContextLoading] = useState(false);
 
+  // Edit form state
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
   useEffect(() => {
     loadProject();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -61,6 +69,9 @@ export default function ProjectDetailPage() {
       setError(null);
       const data = await projectAPI.get(projectId);
       setProject(data as Project);
+      // Initialize edit form with current values
+      setEditName(data?.name || '');
+      setEditDescription(data?.description || '');
     } catch (err) {
       console.error('Error loading project:', err);
       setError('Failed to load project');
@@ -71,8 +82,37 @@ export default function ProjectDetailPage() {
 
   const handleRepositoryConnected = async (repositoryId: string) => {
     console.log('Repository connected:', repositoryId);
-    // Optionally trigger analysis or refresh
-    loadCodebaseContext();
+    // Repository connected, context will be available after first sync
+  };
+
+  const handleSyncComplete = async (snapshotId: string, repositoryId: string) => {
+    console.log('Sync complete, triggering code analysis:', { snapshotId, repositoryId });
+
+    try {
+      // Trigger code analysis
+      const response = await fetch('/api/code-analyzer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          operation: 'analyze',
+          snapshotId,
+          repositoryId,
+          projectId,
+        }),
+      });
+
+      if (response.ok) {
+        console.log('Code analysis triggered successfully');
+        // Load the context after a short delay to allow analysis to complete
+        setTimeout(() => {
+          loadCodebaseContext();
+        }, 2000);
+      }
+    } catch (err) {
+      console.error('Error triggering code analysis:', err);
+    }
   };
 
   const loadCodebaseContext = async () => {
@@ -102,8 +142,36 @@ export default function ProjectDetailPage() {
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
-    if (newValue === 1 && !codebaseContext) {
+    if (newValue === 2 && !codebaseContext) {
       loadCodebaseContext();
+    }
+  };
+
+  const handleSaveProject = async () => {
+    try {
+      setSaving(true);
+      setSaveSuccess(false);
+      setError(null);
+
+      await projectAPI.update(projectId, {
+        name: editName,
+        description: editDescription,
+      });
+
+      // Update local project state
+      setProject((prev) => ({
+        ...prev!,
+        name: editName,
+        description: editDescription,
+      }));
+
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      console.error('Error saving project:', err);
+      setError('Failed to save project');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -156,6 +224,12 @@ export default function ProjectDetailPage() {
           <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
             <Tabs value={tabValue} onChange={handleTabChange}>
               <Tab
+                icon={<Edit />}
+                label="Project Details"
+                iconPosition="start"
+                sx={{ textTransform: 'none', color: 'rgb(161 161 170)' }}
+              />
+              <Tab
                 icon={<Code />}
                 label="Git Integration"
                 iconPosition="start"
@@ -171,10 +245,68 @@ export default function ProjectDetailPage() {
           </Box>
 
           <TabPanel value={tabValue} index={0}>
-            <GitIntegrationPanel projectId={projectId} onConnected={handleRepositoryConnected} />
+            <Stack spacing={3}>
+              <Typography variant="h6" sx={{ color: 'rgb(250 250 250)' }}>
+                Edit Project Details
+              </Typography>
+
+              {saveSuccess && (
+                <Alert severity="success" onClose={() => setSaveSuccess(false)}>
+                  Project updated successfully!
+                </Alert>
+              )}
+
+              <TextField
+                label="Project Name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                fullWidth
+                required
+                helperText="Enter a descriptive name for your project"
+              />
+
+              <TextField
+                label="Project Description"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                fullWidth
+                multiline
+                rows={6}
+                helperText="Describe the purpose and goals of this project"
+              />
+
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <Button
+                  variant="contained"
+                  onClick={handleSaveProject}
+                  disabled={saving || !editName.trim()}
+                  startIcon={saving ? <CircularProgress size={20} /> : null}
+                >
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    setEditName(project?.name || '');
+                    setEditDescription(project?.description || '');
+                  }}
+                  disabled={saving}
+                >
+                  Reset
+                </Button>
+              </Box>
+            </Stack>
           </TabPanel>
 
           <TabPanel value={tabValue} index={1}>
+            <GitIntegrationPanel
+              projectId={projectId}
+              onConnected={handleRepositoryConnected}
+              onSyncComplete={handleSyncComplete}
+            />
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={2}>
             {contextLoading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
                 <CircularProgress />

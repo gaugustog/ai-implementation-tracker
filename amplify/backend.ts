@@ -1,6 +1,8 @@
 import { defineBackend } from '@aws-amplify/backend';
 import { Policy, PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { FunctionUrlAuthType, HttpMethod } from 'aws-cdk-lib/aws-lambda';
+import { Table, AttributeType, BillingMode, ProjectionType } from 'aws-cdk-lib/aws-dynamodb';
+import { RemovalPolicy } from 'aws-cdk-lib';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { storage } from './storage/resource';
@@ -43,7 +45,7 @@ const functionUrl = backend.specificationConversation.resources.lambda.addFuncti
   authType: FunctionUrlAuthType.NONE, // Public access
   cors: {
     allowedOrigins: ['*'],
-    allowedMethods: [HttpMethod.POST, HttpMethod.OPTIONS],
+    allowedMethods: [HttpMethod.POST],
     allowedHeaders: ['Content-Type'],
   },
 });
@@ -60,7 +62,7 @@ const gitIntegrationFunctionUrl = backend.gitIntegration.resources.lambda.addFun
   authType: FunctionUrlAuthType.NONE,
   cors: {
     allowedOrigins: ['*'],
-    allowedMethods: [HttpMethod.POST, HttpMethod.OPTIONS],
+    allowedMethods: [HttpMethod.POST],
     allowedHeaders: ['Content-Type'],
   },
 });
@@ -89,12 +91,40 @@ const gitIntegrationPolicy = new Policy(
 
 backend.gitIntegration.resources.lambda.role?.attachInlinePolicy(gitIntegrationPolicy);
 
+// Create DynamoDB table for Git Integration data
+const gitDataTable = new Table(
+  backend.gitIntegration.resources.lambda,
+  'GitIntegrationTable',
+  {
+    partitionKey: { name: 'id', type: AttributeType.STRING },
+    billingMode: BillingMode.PAY_PER_REQUEST,
+    removalPolicy: RemovalPolicy.DESTROY, // For development; use RETAIN for production
+    tableName: 'GitIntegrationData', // Explicit name for easier debugging
+  }
+);
+
+// Add Global Secondary Index for efficient projectId queries
+gitDataTable.addGlobalSecondaryIndex({
+  indexName: 'ProjectIdIndex',
+  partitionKey: { name: 'projectId', type: AttributeType.STRING },
+  projectionType: ProjectionType.ALL, // Include all attributes in the index
+});
+
+// Grant Lambda access to the table
+gitDataTable.grantReadWriteData(backend.gitIntegration.resources.lambda);
+gitDataTable.grantReadWriteData(backend.codeAnalyzer.resources.lambda);
+
+// Set environment variables
+backend.gitIntegration.addEnvironment('TABLE_NAME', gitDataTable.tableName);
+backend.gitIntegration.addEnvironment('BUCKET_NAME', backend.storage.resources.bucket.bucketName);
+backend.gitIntegration.addEnvironment('DEBUG_GIT_INTEGRATION', process.env.DEBUG_GIT_INTEGRATION || 'false');
+
 // Configure Code Analyzer function
 const codeAnalyzerFunctionUrl = backend.codeAnalyzer.resources.lambda.addFunctionUrl({
   authType: FunctionUrlAuthType.NONE,
   cors: {
     allowedOrigins: ['*'],
-    allowedMethods: [HttpMethod.POST, HttpMethod.OPTIONS],
+    allowedMethods: [HttpMethod.POST],
     allowedHeaders: ['Content-Type'],
   },
 });
@@ -119,12 +149,16 @@ const codeAnalyzerPolicy = new Policy(
 
 backend.codeAnalyzer.resources.lambda.role?.attachInlinePolicy(codeAnalyzerPolicy);
 
+// Set environment variables for Code Analyzer
+backend.codeAnalyzer.addEnvironment('TABLE_NAME', gitDataTable.tableName);
+backend.codeAnalyzer.addEnvironment('BUCKET_NAME', backend.storage.resources.bucket.bucketName);
+
 // Configure Ticket Generation function
 const ticketGenerationFunctionUrl = backend.ticketGeneration.resources.lambda.addFunctionUrl({
   authType: FunctionUrlAuthType.NONE,
   cors: {
     allowedOrigins: ['*'],
-    allowedMethods: [HttpMethod.POST, HttpMethod.OPTIONS],
+    allowedMethods: [HttpMethod.POST],
     allowedHeaders: ['Content-Type'],
   },
 });
