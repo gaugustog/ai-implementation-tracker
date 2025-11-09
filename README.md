@@ -11,9 +11,14 @@ A Next.js dashboard application for managing spec-driven development projects wi
 - 📝 **Specification Management**: Organize specs by type (ANALYSIS, FIXES, PLANS, REVIEWS)
 - 🎫 **Ticket System**: Break down specifications into actionable tickets
 - 🤖 **AI-Powered Specifications**: Interactive specification builder with Amazon Bedrock
+- 🎯 **AI Ticket Generation**: Automated ticket generation with Claude Opus, Sonnet, and Haiku
+- 📋 **Epic Management**: Intelligent grouping of related tickets
+- 🔄 **Dependency Tracking**: Automated dependency analysis and critical path identification
+- 🚀 **Execution Planning**: AI-generated implementation roadmaps with parallelization strategies
 - 🔗 **Git Integration**: Connect GitHub repositories for context-aware AI assistance
 - ☁️ **AWS Amplify Gen2**: Backend powered by AppSync and S3 storage
 - 📄 **Markdown Files**: Store specifications and tickets as .md files in S3
+- 💰 **Cost Tracking**: Token usage and cost estimation for Bedrock operations
 
 ## Tech Stack
 
@@ -87,7 +92,8 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 │   └── functions/          # Lambda functions
 │       ├── specification-conversation/  # Bedrock AI integration
 │       ├── git-integration/            # Git repository operations
-│       └── code-analyzer/              # Codebase analysis
+│       ├── code-analyzer/              # Codebase analysis
+│       └── ticket-generation/          # AI ticket generation pipeline
 ├── components/
 │   ├── layout/              # Layout components
 │   │   ├── Header.tsx       # Top navigation bar
@@ -99,6 +105,9 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 │   │   ├── SpecificationBuilder.tsx   # Main builder with AI chat
 │   │   ├── SpecificationChat.tsx      # Chat interface
 │   │   └── MarkdownEditor.tsx         # Editor with preview
+│   ├── tickets/             # Ticket components
+│   │   ├── TicketGenerationView.tsx   # Main ticket generation UI
+│   │   └── TicketCard.tsx             # Individual ticket display
 │   ├── AmplifyProvider.tsx  # Amplify context provider
 │   └── ThemeRegistry.tsx    # Material UI theme provider
 ├── lib/
@@ -107,6 +116,11 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 │   │   ├── amplify.ts       # AppSync API operations
 │   │   ├── storage.ts       # S3 storage operations
 │   │   └── claude.ts        # Claude CLI integration (mock)
+│   ├── hooks/               # React hooks
+│   │   ├── useSpecificationConversation.ts  # AI chat hook
+│   │   └── useTicketGeneration.ts           # Ticket generation hook
+│   ├── utils/               # Utility functions
+│   │   └── cost-tracking.ts # Cost and token optimization
 │   └── types/               # TypeScript type definitions
 │       └── index.ts
 └── public/                  # Static assets
@@ -149,6 +163,44 @@ The application uses AWS Amplify Gen2 with:
 See [AMPLIFY_SETUP.md](./AMPLIFY_SETUP.md) for detailed setup instructions.
 See [BEDROCK_INTEGRATION.md](./BEDROCK_INTEGRATION.md) for Bedrock integration details.
 See [GIT_INTEGRATION.md](./GIT_INTEGRATION.md) for Git integration guide.
+See [TICKET_GENERATION.md](./TICKET_GENERATION.md) for AI ticket generation system.
+
+## AI-Powered Ticket Generation
+
+The application includes a comprehensive AI-powered ticket generation system that automatically breaks down specifications into atomic, implementable tickets with detailed execution plans.
+
+### Key Features:
+- **8-Step Pipeline**: Automated analysis, component identification, ticket generation, dependency mapping, and optimization
+- **Multi-Model Strategy**: Uses Claude Opus for complex analysis, Sonnet for content generation, and Haiku for exploration
+- **Intelligent Grouping**: Automatically organizes tickets into logical epics
+- **Dependency Analysis**: Identifies dependencies and generates critical path
+- **Parallelization Optimization**: Recommends parallel execution strategies for AI agents
+- **Cost Tracking**: Estimates and tracks token usage and costs
+- **Portuguese Support**: All generated content in pt-BR
+
+### Generated Outputs:
+1. **Atomic Tickets**: Small, implementable tasks (max 3 days each)
+2. **SUMMARY.md**: Executive summary with ticket breakdown and risk assessment
+3. **EXECUTION_PLAN.md**: Detailed implementation roadmap with parallel tracks
+
+### Usage:
+```typescript
+import { useTicketGeneration } from '@/lib/hooks/useTicketGeneration';
+
+const { generateTickets, result } = useTicketGeneration();
+
+await generateTickets({
+  specificationId: 'spec-001',
+  specificationContent: 'Your specification...',
+  specType: 'ANALYSIS',
+  planNamePrefix: 'AU',
+});
+```
+
+For comprehensive documentation and examples, see:
+- [TICKET_GENERATION.md](./TICKET_GENERATION.md) - Complete implementation guide
+- [TICKET_GENERATION_EXAMPLES.md](./TICKET_GENERATION_EXAMPLES.md) - Usage examples
+- [IMPLEMENTATION_COMPLETE.md](./IMPLEMENTATION_COMPLETE.md) - Implementation summary
 
 ## Development
 

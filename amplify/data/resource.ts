@@ -8,7 +8,9 @@ const schema = a.schema({
       createdAt: a.datetime(),
       updatedAt: a.datetime(),
       specifications: a.hasMany('Specification', 'projectId'),
+      specificationDrafts: a.hasMany('SpecificationDraft', 'projectId'),
       gitRepository: a.hasOne('GitRepository', 'projectId'),
+      projectContext: a.hasOne('ProjectContext', 'projectId'),
     })
     .authorization((allow) => [allow.publicApiKey()]),
 
@@ -19,7 +21,21 @@ const schema = a.schema({
       fileKey: a.string(), // S3 file key for markdown file
       projectId: a.id().required(),
       project: a.belongsTo('Project', 'projectId'),
+      epics: a.hasMany('Epic', 'specificationId'),
       tickets: a.hasMany('Ticket', 'specificationId'),
+      createdAt: a.datetime(),
+      updatedAt: a.datetime(),
+    })
+    .authorization((allow) => [allow.publicApiKey()]),
+
+  Epic: a
+    .model({
+      title: a.string().required(),
+      epicNumber: a.integer().required(),
+      description: a.string(),
+      specificationId: a.id().required(),
+      specification: a.belongsTo('Specification', 'specificationId'),
+      tickets: a.hasMany('Ticket', 'epicId'),
       createdAt: a.datetime(),
       updatedAt: a.datetime(),
     })
@@ -28,14 +44,40 @@ const schema = a.schema({
   Ticket: a
     .model({
       title: a.string().required(),
+      ticketNumber: a.integer().required(),
+      epicNumber: a.integer(),
+      epicId: a.id(),
+      epic: a.belongsTo('Epic', 'epicId'),
       description: a.string(),
+      s3MdFileObjectKey: a.string(), // S3 file key for markdown file
+      acceptanceCriteria: a.string().array(), // Array of strings
+      estimatedMinutes: a.integer(),
+      complexity: a.enum(['simple', 'medium', 'complex']),
+      parallelizable: a.boolean().default(false),
+      aiAgentCapable: a.boolean().default(false), // Can be implemented by AI coding agent
+      requiredExpertise: a.string().array(), // Array of strings
+      testingStrategy: a.string(),
+      rollbackPlan: a.string(),
       status: a.enum(['todo', 'in_progress', 'done']),
       specType: a.enum(['ANALYSIS', 'FIXES', 'PLANS', 'REVIEWS']),
       fileKey: a.string(), // S3 file key for markdown file
       specificationId: a.id(),
       specification: a.belongsTo('Specification', 'specificationId'),
+      dependencies: a.hasMany('TicketDependency', 'ticketId'), // Tickets this ticket depends on
+      dependentTickets: a.hasMany('TicketDependency', 'dependsOnId'), // Tickets that depend on this one
       createdAt: a.datetime(),
       updatedAt: a.datetime(),
+    })
+    .authorization((allow) => [allow.publicApiKey()]),
+
+  TicketDependency: a
+    .model({
+      ticketId: a.id().required(),
+      ticket: a.belongsTo('Ticket', 'ticketId'),
+      dependsOnId: a.id().required(),
+      dependsOn: a.belongsTo('Ticket', 'dependsOnId'),
+      dependencyType: a.enum(['blocks', 'requires', 'relates_to']),
+      createdAt: a.datetime(),
     })
     .authorization((allow) => [allow.publicApiKey()]),
 

@@ -55,7 +55,7 @@ export default function SettingsPage() {
             <TextField
               label="Model"
               fullWidth
-              defaultValue="claude-3-opus-20240229"
+              defaultValue="anthropic.claude-opus-4-20250514-v1:0"
               sx={{
                 '& .MuiOutlinedInput-root': {
                   color: 'rgb(250 250 250)',

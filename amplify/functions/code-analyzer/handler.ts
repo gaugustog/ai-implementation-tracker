@@ -148,15 +148,24 @@ async function handleAnalyze(request: AnalysisEvent) {
 
     // Create or update ProjectContext
     if (repository?.projectId) {
+      // Store full context in S3 (to avoid DynamoDB 400KB limit)
+      const contextKey = `git/${repositoryId}/context-${Date.now()}.json`;
+      await s3Client.send(new PutObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: contextKey,
+        Body: JSON.stringify(projectContext),
+        ContentType: 'application/json',
+      }));
+
+      // Store reference in DynamoDB (small)
       const contextId = `context-${repository.projectId}`;
       await dynamoClient.send(new PutCommand({
         TableName: TABLE_NAME,
         Item: {
           id: contextId,
           projectId: repository.projectId,
+          contextKey, // S3 reference
           techStack: projectContext.techStack,
-          dependencies: projectContext.dependencies,
-          fileStructure: projectContext.fileStructure,
           patterns: projectContext.patterns,
           integrationPoints: projectContext.integrationPoints,
           lastAnalyzedAt: new Date().toISOString(),
@@ -192,36 +201,56 @@ async function handleGetContext(request: AnalysisEvent) {
   }
 
   try {
-    // Get project context
+    // Get project context reference from DynamoDB
     const contextId = `context-${projectId}`;
-    const { Item: context } = await dynamoClient.send(new GetCommand({
+    const { Item: contextRef } = await dynamoClient.send(new GetCommand({
       TableName: TABLE_NAME,
       Key: { id: contextId },
     }));
 
-    if (!context) {
+    if (!contextRef) {
       return createResponse(404, { error: 'Project context not found' });
+    }
+
+    // If contextKey exists, fetch full context from S3
+    let fullContext: ProjectContextData;
+    if (contextRef.contextKey) {
+      const contextResponse = await s3Client.send(new GetObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: contextRef.contextKey,
+      }));
+      const contextData = await streamToString(contextResponse.Body);
+      fullContext = JSON.parse(contextData);
+    } else {
+      // Fallback to DynamoDB data (old format)
+      fullContext = {
+        techStack: contextRef.techStack,
+        patterns: contextRef.patterns,
+        integrationPoints: contextRef.integrationPoints,
+        dependencies: contextRef.dependencies || {},
+        fileStructure: contextRef.fileStructure || {},
+      };
     }
 
     // Select relevant files based on specification type and keywords
     const relevantFiles = selectRelevantFiles(
-      context.fileStructure,
+      fullContext.fileStructure,
       specificationType || 'ANALYSIS',
       keywords || []
     );
 
     // Build context for Bedrock
     const bedrockContext = {
-      techStack: context.techStack,
-      patterns: context.patterns,
-      integrationPoints: context.integrationPoints,
+      techStack: fullContext.techStack,
+      patterns: fullContext.patterns,
+      integrationPoints: fullContext.integrationPoints,
       relevantFiles,
-      dependencies: context.dependencies,
+      dependencies: fullContext.dependencies,
     };
 
     return createResponse(200, {
       context: bedrockContext,
-      lastAnalyzedAt: context.lastAnalyzedAt,
+      lastAnalyzedAt: contextRef.lastAnalyzedAt,
     });
   } catch (error) {
     console.error('Error getting context:', error);

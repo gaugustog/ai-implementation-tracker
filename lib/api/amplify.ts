@@ -226,7 +226,18 @@ export const ticketAPI = {
 
   create: async (ticket: {
     title: string;
+    ticketNumber: number;
+    epicNumber?: number;
     description?: string;
+    s3MdFileObjectKey?: string;
+    acceptanceCriteria?: string[];
+    estimatedMinutes?: number;
+    complexity?: 'simple' | 'medium' | 'complex';
+    parallelizable?: boolean;
+    aiAgentCapable?: boolean;
+    requiredExpertise?: string[];
+    testingStrategy?: string;
+    rollbackPlan?: string;
     status: 'todo' | 'in_progress' | 'done';
     specType: 'ANALYSIS' | 'FIXES' | 'PLANS' | 'REVIEWS';
     fileKey?: string;
@@ -234,7 +245,18 @@ export const ticketAPI = {
   }) => {
     const { data, errors } = await client.models.Ticket.create({
       title: ticket.title,
+      ticketNumber: ticket.ticketNumber,
+      epicNumber: ticket.epicNumber,
       description: ticket.description || '',
+      s3MdFileObjectKey: ticket.s3MdFileObjectKey,
+      acceptanceCriteria: ticket.acceptanceCriteria,
+      estimatedMinutes: ticket.estimatedMinutes,
+      complexity: ticket.complexity,
+      parallelizable: ticket.parallelizable,
+      aiAgentCapable: ticket.aiAgentCapable,
+      requiredExpertise: ticket.requiredExpertise,
+      testingStrategy: ticket.testingStrategy,
+      rollbackPlan: ticket.rollbackPlan,
       status: ticket.status,
       specType: ticket.specType,
       fileKey: ticket.fileKey,
