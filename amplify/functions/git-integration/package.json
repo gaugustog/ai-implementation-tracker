@@ -1,6 +1,20 @@
 {
   "name": "git-integration",
   "version": "1.0.0",
+  "description": "Git integration Lambda for SpecForge",
   "type": "module",
-  "private": true
+  "main": "handler.ts",
+  "private": true,
+  "scripts": {
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-kms": "^3.0.0",
+    "@octokit/rest": "^20.0.0",
+    "aws-amplify": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
 }
