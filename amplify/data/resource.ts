@@ -124,6 +124,7 @@ const schema = a.schema({
     isActive: a.boolean().default(true),
     order: a.integer(),
     createdBy: a.string(), // 'system' or userId
+    specifications: a.hasMany('Specification', 'specificationTypeId'),
     createdAt: a.datetime(),
     updatedAt: a.datetime(),
   }).authorization(allow => [allow.publicApiKey()]),
