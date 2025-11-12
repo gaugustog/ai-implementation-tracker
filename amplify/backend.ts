@@ -1,5 +1,6 @@
 import { defineBackend } from '@aws-amplify/backend';
 import { Key } from 'aws-cdk-lib/aws-kms';
+import { StringParameter } from 'aws-cdk-lib/aws-ssm';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { storage } from './storage/resource';
@@ -47,11 +48,23 @@ const gitCredentialKey = new Key(
 // Grant Lambda permissions to use the KMS key
 gitCredentialKey.grantEncryptDecrypt(backend.gitIntegration.resources.lambda);
 
-// Add KMS key ID as environment variable for Lambda
-backend.gitIntegration.resources.lambda.addEnvironment(
-  'KMS_KEY_ID',
-  gitCredentialKey.keyId
+// ============================================================================
+// SSM PARAMETER STORE
+// ============================================================================
+
+// Store KMS key ID in SSM Parameter Store (more secure than environment variables)
+const kmsKeyParameter = new StringParameter(
+  backend.gitIntegration.resources.lambda,
+  'GitCredentialKmsKeyParameter',
+  {
+    parameterName: '/specforge/git-integration/kms-key-id',
+    stringValue: gitCredentialKey.keyId,
+    description: 'KMS key ID for Git credential encryption',
+  }
 );
+
+// Grant Lambda permission to read from SSM Parameter Store
+kmsKeyParameter.grantRead(backend.gitIntegration.resources.lambda);
 
 // ============================================================================
 // NOTES
@@ -70,13 +83,17 @@ backend.gitIntegration.resources.lambda.addEnvironment(
  *    - Injected automatically via grantMutation/grantQuery
  *    - Access in Lambda: process.env.API_SPECFORGEDATAAPI_GRAPHQLAPIIDOUTPUT
  *
- * 3. KMS_KEY_ID
- *    - KMS key ID for encryption
- *    - Injected manually via addEnvironment above
- *    - Access in Lambda: process.env.KMS_KEY_ID
+ * SSM Parameters:
+ *
+ * 1. /specforge/git-integration/kms-key-id
+ *    - KMS key ID for Git credential encryption
+ *    - Stored in SSM Parameter Store for better security
+ *    - Access in Lambda: await ssm.getParameter({ Name: '/specforge/git-integration/kms-key-id' })
+ *    - Benefits: Centralized config, audit trail, no redeployment for rotation
  *
  * Architecture Pattern:
  * - Lambda → AppSync → DynamoDB (AppSync-first, no direct DynamoDB access)
  * - CloudFormation creates AppSync first, then Lambda with injected endpoint
  * - No circular dependencies: Lambda extends after defineBackend() completes
+ * - Configuration via SSM for sensitive values (KMS keys, secrets)
  */
