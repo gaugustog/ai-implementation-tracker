@@ -54,6 +54,7 @@ const schema = a.schema({
     language: a.string(),
     packageJson: a.json(),
     dependencies: a.hasMany('MonorepoDependency', 'workspaceId'),
+    dependents: a.hasMany('MonorepoDependency', 'dependsOnWorkspaceId'),
     contexts: a.hasMany('Context', 'workspaceId'),
     metadata: a.json(),
     createdAt: a.datetime(),
