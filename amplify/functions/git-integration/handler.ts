@@ -1,5 +1,6 @@
 import { generateClient } from 'aws-amplify/data';
 import type { Schema } from '../../data/resource';
+import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
 import { KMSEncryption } from './lib/kms-encryption';
 import { GitProviderFactory } from './lib/git-providers/factory';
 import type {
@@ -15,6 +16,9 @@ import type {
 // Generate Amplify Data client (uses auto-injected AppSync config)
 const client = generateClient<Schema>();
 
+// SSM client for parameter retrieval
+const ssmClient = new SSMClient({});
+
 // Singleton instance for KMS (reused across warm Lambda invocations)
 let kmsEncryption: KMSEncryption | null = null;
 
@@ -29,14 +33,20 @@ async function initialize(): Promise<void> {
 
   console.log('Initializing Lambda...');
 
-  // Get KMS key ID from environment variable (injected by backend.ts)
-  const kmsKeyId = process.env.KMS_KEY_ID;
+  // Get KMS key ID from SSM Parameter Store
+  console.log('Retrieving KMS key ID from SSM...');
+  const command = new GetParameterCommand({
+    Name: '/specforge/git-integration/kms-key-id',
+  });
+
+  const response = await ssmClient.send(command);
+  const kmsKeyId = response.Parameter?.Value;
 
   if (!kmsKeyId) {
-    throw new Error('Missing required environment variable: KMS_KEY_ID');
+    throw new Error('Failed to retrieve KMS key ID from SSM Parameter Store');
   }
 
-  console.log('KMS Key ID:', kmsKeyId);
+  console.log('KMS Key ID retrieved from SSM:', kmsKeyId);
 
   kmsEncryption = new KMSEncryption(kmsKeyId);
 
@@ -227,9 +237,16 @@ async function listBranches(data: ListBranchesData): Promise<GitIntegrationRespo
     throw new Error(`No credential found for repository: ${data.repositoryId}`);
   }
   const credential = credentials[0];
+
+  if (!credential.encryptedToken) {
+    throw new Error('Credential has no encrypted token');
+  }
   const decryptedToken = await kmsEncryption!.decrypt(credential.encryptedToken);
 
   // Get branches from provider
+  if (!repository.provider) {
+    throw new Error('Repository has no provider configured');
+  }
   const gitProvider = GitProviderFactory.create(repository.provider);
   const branches = await gitProvider.listBranches(repository.repoUrl, decryptedToken);
 
@@ -274,9 +291,16 @@ async function switchBranch(data: SwitchBranchData): Promise<GitIntegrationRespo
     throw new Error(`No credential found for repository: ${data.repositoryId}`);
   }
   const credential = credentials[0];
+
+  if (!credential.encryptedToken) {
+    throw new Error('Credential has no encrypted token');
+  }
   const decryptedToken = await kmsEncryption!.decrypt(credential.encryptedToken);
 
   // Verify branch exists
+  if (!repository.provider) {
+    throw new Error('Repository has no provider configured');
+  }
   const gitProvider = GitProviderFactory.create(repository.provider);
   const branchExists = await gitProvider.branchExists(
     repository.repoUrl,
@@ -366,9 +390,16 @@ async function validateAccess(data: ValidateAccessData): Promise<GitIntegrationR
     throw new Error(`No credential found for repository: ${data.repositoryId}`);
   }
   const credential = credentials[0];
+
+  if (!credential.encryptedToken) {
+    throw new Error('Credential has no encrypted token');
+  }
   const decryptedToken = await kmsEncryption!.decrypt(credential.encryptedToken);
 
   // Test access
+  if (!repository.provider) {
+    throw new Error('Repository has no provider configured');
+  }
   const gitProvider = GitProviderFactory.create(repository.provider);
 
   try {

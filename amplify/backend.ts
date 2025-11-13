@@ -66,8 +66,8 @@ const gitCredentialKey = new Key(
 // Grant Lambda permissions to use the KMS key
 gitCredentialKey.grantEncryptDecrypt(backend.gitIntegration.resources.lambda);
 
-// Inject KMS key ID as environment variable
-lambdaFunction.addEnvironment('KMS_KEY_ID', gitCredentialKey.keyId);
+// Note: KMS key ID stored in SSM Parameter Store (see below)
+// No environment variable injection - Lambda reads from SSM directly
 
 // ============================================================================
 // SSM PARAMETER STORE
