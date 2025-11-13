@@ -10,10 +10,23 @@ const client = generateClient<Schema>();
  * Execute Git integration operation via GraphQL custom query
  */
 async function executeGitOperation(operation: string, data: any): Promise<any> {
+  console.log(`\n🔍 Calling gitIntegration query:`);
+  console.log(`   Operation: ${operation}`);
+  console.log(`   Data:`, JSON.stringify(data, null, 2));
+
   const result = await client.queries.gitIntegration({
     operation,
     data: JSON.stringify(data),
   });
+
+  console.log(`\n📥 GraphQL Response:`);
+  console.log(`   result.data:`, result.data);
+  console.log(`   result.errors:`, result.errors);
+
+  if (result.errors && result.errors.length > 0) {
+    console.error('GraphQL Errors:', JSON.stringify(result.errors, null, 2));
+    throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
+  }
 
   if (!result.data) {
     throw new Error('No data returned from gitIntegration query');
