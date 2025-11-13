@@ -194,6 +194,18 @@ const schema = a.schema({
     type: a.enum(['blocks', 'requires']),
     createdAt: a.datetime(),
   }).authorization(allow => [allow.publicApiKey()]),
+
+  // === CUSTOM QUERIES ===
+  // Git Integration Lambda invocation
+  gitIntegrationOperation: a
+    .query()
+    .arguments({
+      operation: a.string().required(),
+      data: a.json().required(),
+    })
+    .returns(a.json())
+    .handler(a.handler.function('gitIntegration'))
+    .authorization(allow => [allow.publicApiKey()]),
 });
 
 export type Schema = ClientSchema<typeof schema>;
