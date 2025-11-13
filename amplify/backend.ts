@@ -8,6 +8,7 @@ import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { storage } from './storage/resource';
 import { gitIntegration } from './functions/git-integration/resource';
+import { monorepoAnalyzer } from './functions/monorepo-analyzer/resource';
 
 // Initialize backend with all resources
 const backend = defineBackend({
@@ -15,6 +16,7 @@ const backend = defineBackend({
   data,
   storage,
   gitIntegration,
+  monorepoAnalyzer,
 });
 
 // Extract environment and AppSync references
@@ -91,6 +93,29 @@ gitIntegrationLambda.addEnvironment('KMS_KEY_ID_PARAMETER', kmsKeyParameter.para
 
 console.log('✅ Configured SSM Parameter Store for KMS key ID');
 console.log(`   - Parameter: /specforge/${envName}/kms-key-id`);
+
+// Configure Monorepo Analyzer Lambda (same SSM parameters, AppSync access, KMS decrypt)
+const monorepoAnalyzerLambda = backend.monorepoAnalyzer.resources.lambda as Function;
+
+appSyncUrlParameter.grantRead(monorepoAnalyzerLambda);
+monorepoAnalyzerLambda.addEnvironment('APPSYNC_URL_PARAMETER', appSyncUrlParameter.parameterName);
+
+kmsKeyParameter.grantRead(monorepoAnalyzerLambda);
+monorepoAnalyzerLambda.addEnvironment('KMS_KEY_ID_PARAMETER', kmsKeyParameter.parameterName);
+
+gitCredentialKey.grantDecrypt(monorepoAnalyzerLambda);
+
+const monorepoAppSyncPolicy = new iam.PolicyStatement({
+  effect: iam.Effect.ALLOW,
+  actions: ['appsync:GraphQL'],
+  resources: [`arn:aws:appsync:${dataRegion}:*:apis/${graphqlApiId}/*`],
+});
+monorepoAnalyzerLambda.addToRolePolicy(monorepoAppSyncPolicy);
+
+console.log('✅ Configured Monorepo Analyzer Lambda');
+console.log(`   - Granted SSM read permissions`);
+console.log(`   - Granted AppSync GraphQL API access`);
+console.log(`   - Granted KMS decrypt permission`);
 
 // ============================================================================
 // ARCHITECTURE NOTES

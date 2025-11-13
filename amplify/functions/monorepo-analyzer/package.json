@@ -1,0 +1,33 @@
+{
+  "name": "monorepo-analyzer",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Analyzes repository structure and detects monorepo types",
+  "main": "handler.ts",
+  "dependencies": {
+    "@aws-sdk/client-kms": "^3.0.0",
+    "@aws-sdk/client-ssm": "^3.0.0",
+    "@aws-sdk/signature-v4": "^3.0.0",
+    "@aws-sdk/protocol-http": "^3.0.0",
+    "@aws-sdk/credential-provider-node": "^3.0.0",
+    "@smithy/hash-node": "^3.0.0",
+    "aws-lambda": "^1.0.7",
+    "simple-git": "^3.24.0",
+    "glob": "^10.3.10",
+    "fast-glob": "^3.3.2",
+    "yaml": "^2.4.2",
+    "comment-json": "^4.2.3"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.0",
+    "@types/node": "^20.0.0",
+    "esbuild": "^0.21.0",
+    "tsx": "^4.11.0",
+    "typescript": "^5.0.0"
+  },
+  "scripts": {
+    "build": "tsc && esbuild handler.ts --bundle --platform=node --target=node18 --outfile=dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist node_modules"
+  }
+}
