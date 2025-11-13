@@ -15,7 +15,7 @@ export interface MonorepoAnalysisResult {
   workspaces: Array<{
     name: string;                // Package name from package.json
     path: string;                // Relative path from repo root
-    type: 'app' | 'package' | 'library' | 'feature';
+    type: 'app' | 'package' | 'library' | 'feature' | 'single';
     framework?: string;          // 'nextjs', 'react', 'vue', etc.
     language?: string;           // 'typescript', 'javascript'
     packageJson: any;            // Full package.json content
