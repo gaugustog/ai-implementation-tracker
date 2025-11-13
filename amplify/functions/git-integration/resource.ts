@@ -9,4 +9,5 @@ export const gitIntegration = defineFunction({
     NODE_ENV: 'production',
     // APPSYNC_ENDPOINT is auto-injected by Amplify via GraphQL handler
   },
+  resourceGroupName: 'data', // Assign to data stack to avoid circular dependency
 });
