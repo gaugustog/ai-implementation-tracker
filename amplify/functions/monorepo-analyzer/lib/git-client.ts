@@ -1,4 +1,4 @@
-import simpleGit, { SimpleGit } from 'simple-git';
+import simpleGit from 'simple-git';
 import { KMSClient, DecryptCommand } from '@aws-sdk/client-kms';
 import path from 'path';
 import fs from 'fs/promises';
