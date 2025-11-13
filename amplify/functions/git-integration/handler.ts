@@ -35,27 +35,43 @@ async function initialize(): Promise<void> {
   console.log(JSON.stringify(process.env, null, 2));
   console.log('\n');
 
-  // Get AppSync endpoint from environment variable
-  // Amplify auto-injects this when using .handler(a.handler.function(...))
-  // Format: API_{API_NAME}_GRAPHQLAPIENDPOINTOUTPUT
-  const appsyncEndpoint =
-    process.env.APPSYNC_ENDPOINT ||
-    process.env.API_SPECFORGEDATAAPI_GRAPHQLAPIENDPOINTOUTPUT;
-
-  if (!appsyncEndpoint) {
-    throw new Error('Missing AppSync endpoint. Expected APPSYNC_ENDPOINT or API_SPECFORGEDATAAPI_GRAPHQLAPIENDPOINTOUTPUT');
+  // Get AppSync endpoint from SSM Parameter Store
+  const appsyncUrlParameterName = process.env.APPSYNC_URL_PARAMETER;
+  if (!appsyncUrlParameterName) {
+    throw new Error('Missing APPSYNC_URL_PARAMETER environment variable');
   }
 
-  console.log('AppSync Endpoint:', appsyncEndpoint);
+  console.log('Retrieving AppSync endpoint from SSM...');
+  console.log(`Parameter name: ${appsyncUrlParameterName}`);
 
-  // Get KMS key ID from SSM Parameter Store
-  console.log('Retrieving KMS key ID from SSM...');
-  const command = new GetParameterCommand({
-    Name: '/specforge/git-integration/kms-key-id',
+  const appsyncUrlCommand = new GetParameterCommand({
+    Name: appsyncUrlParameterName,
   });
 
-  const response = await ssmClient.send(command);
-  const kmsKeyId = response.Parameter?.Value;
+  const appsyncUrlResponse = await ssmClient.send(appsyncUrlCommand);
+  const appsyncEndpoint = appsyncUrlResponse.Parameter?.Value;
+
+  if (!appsyncEndpoint) {
+    throw new Error('Failed to retrieve AppSync endpoint from SSM Parameter Store');
+  }
+
+  console.log('AppSync Endpoint retrieved from SSM:', appsyncEndpoint);
+
+  // Get KMS key ID from SSM Parameter Store
+  const kmsKeyParameterName = process.env.KMS_KEY_ID_PARAMETER;
+  if (!kmsKeyParameterName) {
+    throw new Error('Missing KMS_KEY_ID_PARAMETER environment variable');
+  }
+
+  console.log('Retrieving KMS key ID from SSM...');
+  console.log(`Parameter name: ${kmsKeyParameterName}`);
+
+  const kmsKeyCommand = new GetParameterCommand({
+    Name: kmsKeyParameterName,
+  });
+
+  const kmsKeyResponse = await ssmClient.send(kmsKeyCommand);
+  const kmsKeyId = kmsKeyResponse.Parameter?.Value;
 
   if (!kmsKeyId) {
     throw new Error('Failed to retrieve KMS key ID from SSM Parameter Store');
@@ -117,8 +133,8 @@ export const handler = async (event: GitIntegrationEvent): Promise<any> => {
         throw new Error(`Unknown operation: ${operation}`);
     }
 
-    // Return as JSON string for AppSync custom query (schema expects a.json())
-    return JSON.stringify(result);
+    // Return object directly - AppSync handles JSON serialization with .returns(a.json())
+    return result;
   } catch (error: any) {
     console.error('='.repeat(80));
     console.error('❌ Error in git-integration Lambda:');
@@ -134,8 +150,8 @@ export const handler = async (event: GitIntegrationEvent): Promise<any> => {
       },
     };
 
-    // Return error as JSON string for AppSync custom query
-    return JSON.stringify(errorResponse);
+    // Return error object directly - AppSync handles JSON serialization
+    return errorResponse;
   }
 };
 

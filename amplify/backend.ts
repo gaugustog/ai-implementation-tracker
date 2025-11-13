@@ -1,15 +1,15 @@
 import { defineBackend } from '@aws-amplify/backend';
+import { Stack } from 'aws-cdk-lib';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import { Key } from 'aws-cdk-lib/aws-kms';
 import { StringParameter } from 'aws-cdk-lib/aws-ssm';
+import { Function } from 'aws-cdk-lib/aws-lambda';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { storage } from './storage/resource';
 import { gitIntegration } from './functions/git-integration/resource';
 
-/**
- * Define the Amplify backend
- * @see https://docs.amplify.aws/react/build-a-backend/
- */
+// Initialize backend with all resources
 const backend = defineBackend({
   auth,
   data,
@@ -17,20 +17,48 @@ const backend = defineBackend({
   gitIntegration,
 });
 
-// ============================================================================
-// APPSYNC PERMISSIONS
-// ============================================================================
+// Extract environment and AppSync references
+const graphqlUrl = backend.data.resources.cfnResources.cfnGraphqlApi.attrGraphQlUrl;
+const graphqlApiId = backend.data.resources.cfnResources.cfnGraphqlApi.attrApiId;
+const dataRegion = Stack.of(backend.data).region;
+const stackName = Stack.of(backend.data).stackName;
+const envName = stackName.split('-')[2] || 'sandbox';
 
-// Grant Lambda permission to invoke AppSync GraphQL API
-// - Creates IAM permissions for Lambda to call AppSync
-// - Grants all necessary DynamoDB permissions via AppSync (no direct DynamoDB access needed)
-// - AppSync endpoint is auto-injected by Amplify when using .handler(a.handler.function(...))
-backend.data.resources.graphqlApi.grantMutation(backend.gitIntegration.resources.lambda);
-backend.data.resources.graphqlApi.grantQuery(backend.gitIntegration.resources.lambda);
+console.log(`📦 Environment: ${envName}`);
+console.log(`📦 Stack: ${stackName}`);
 
-// ============================================================================
-// KMS ENCRYPTION KEY
-// ============================================================================
+// Store AppSync URL in SSM for environment-aware configuration
+// Lambda will read from /specforge/{env}/appsync-url instead of hardcoded env vars
+const appSyncUrlParameter = new StringParameter(
+  backend.gitIntegration.resources.lambda,
+  'AppSyncUrlParameter',
+  {
+    parameterName: `/specforge/${envName}/appsync-url`,
+    stringValue: graphqlUrl,
+    description: `AppSync GraphQL API endpoint URL for ${envName} environment`,
+  }
+);
+
+console.log('✅ Configured AppSync URL in SSM Parameter Store');
+console.log(`   - Parameter: /specforge/${envName}/appsync-url`);
+console.log(`   - GraphQL Endpoint: ${graphqlUrl}`);
+
+// Configure Lambda permissions and environment
+const gitIntegrationLambda = backend.gitIntegration.resources.lambda as Function;
+
+appSyncUrlParameter.grantRead(gitIntegrationLambda);
+gitIntegrationLambda.addEnvironment('APPSYNC_URL_PARAMETER', appSyncUrlParameter.parameterName);
+
+const appSyncPolicy = new iam.PolicyStatement({
+  effect: iam.Effect.ALLOW,
+  actions: ['appsync:GraphQL'],
+  resources: [`arn:aws:appsync:${dataRegion}:*:apis/${graphqlApiId}/*`],
+});
+gitIntegrationLambda.addToRolePolicy(appSyncPolicy);
+
+console.log('✅ Configured Git Integration Lambda');
+console.log(`   - Granted SSM read permission for AppSync URL`);
+console.log(`   - Granted AppSync GraphQL API access`);
 
 // Create KMS key for Git credential encryption
 const gitCredentialKey = new Key(
@@ -38,63 +66,49 @@ const gitCredentialKey = new Key(
   'GitCredentialEncryptionKey',
   {
     description: 'SpecForge - Git credential encryption key',
-    enableKeyRotation: true, // Automatic key rotation for security
+    enableKeyRotation: true,
     alias: 'specforge/git-credentials',
   }
 );
 
-// Grant Lambda permissions to use the KMS key
-gitCredentialKey.grantEncryptDecrypt(backend.gitIntegration.resources.lambda);
+gitCredentialKey.grantEncryptDecrypt(gitIntegrationLambda);
 
-// Note: KMS key ID stored in SSM Parameter Store (see below)
-// No environment variable injection - Lambda reads from SSM directly
+console.log('✅ Configured KMS encryption key for Git credentials');
 
-// ============================================================================
-// SSM PARAMETER STORE
-// ============================================================================
-
-// Store KMS key ID in SSM Parameter Store (more secure than environment variables)
+// Store KMS key ID in SSM for environment-aware configuration
 const kmsKeyParameter = new StringParameter(
   backend.gitIntegration.resources.lambda,
   'GitCredentialKmsKeyParameter',
   {
-    parameterName: '/specforge/git-integration/kms-key-id',
+    parameterName: `/specforge/${envName}/kms-key-id`,
     stringValue: gitCredentialKey.keyId,
-    description: 'KMS key ID for Git credential encryption',
+    description: `KMS key ID for Git credential encryption in ${envName} environment`,
   }
 );
 
-// Grant Lambda permission to read from SSM Parameter Store
-kmsKeyParameter.grantRead(backend.gitIntegration.resources.lambda);
+kmsKeyParameter.grantRead(gitIntegrationLambda);
+gitIntegrationLambda.addEnvironment('KMS_KEY_ID_PARAMETER', kmsKeyParameter.parameterName);
+
+console.log('✅ Configured SSM Parameter Store for KMS key ID');
+console.log(`   - Parameter: /specforge/${envName}/kms-key-id`);
 
 // ============================================================================
-// NOTES
+// ARCHITECTURE NOTES
 // ============================================================================
 
 /**
- * Environment Variables Auto-Injected by Amplify:
+ * SSM Parameter Store Pattern
  *
- * 1. API_SPECFORGEDATAAPI_GRAPHQLAPIENDPOINTOUTPUT
- *    - AppSync GraphQL endpoint URL
- *    - Injected automatically via grantMutation/grantQuery
- *    - Access in Lambda: process.env.API_SPECFORGEDATAAPI_GRAPHQLAPIENDPOINTOUTPUT
+ * Configuration is stored in SSM using environment-aware paths:
+ * - /specforge/{env}/appsync-url - AppSync GraphQL endpoint (shared across Lambdas)
+ * - /specforge/{env}/kms-key-id - KMS key for credential encryption
  *
- * 2. API_SPECFORGEDATAAPI_GRAPHQLAPIIDOUTPUT
- *    - AppSync API ID
- *    - Injected automatically via grantMutation/grantQuery
- *    - Access in Lambda: process.env.API_SPECFORGEDATAAPI_GRAPHQLAPIIDOUTPUT
+ * Benefits:
+ * - Environment isolation (sandbox, dev, prod)
+ * - Centralized configuration
+ * - No redeployment needed for config changes
+ * - Audit trail via CloudWatch
  *
- * SSM Parameters:
- *
- * 1. /specforge/git-integration/kms-key-id
- *    - KMS key ID for Git credential encryption
- *    - Stored in SSM Parameter Store for better security
- *    - Access in Lambda: await ssm.getParameter({ Name: '/specforge/git-integration/kms-key-id' })
- *    - Benefits: Centralized config, audit trail, no redeployment for rotation
- *
- * Architecture Pattern:
- * - Lambda → AppSync → DynamoDB (AppSync-first, no direct DynamoDB access)
- * - CloudFormation creates AppSync first, then Lambda with injected endpoint
- * - No circular dependencies: Lambda extends after defineBackend() completes
- * - Configuration via SSM for sensitive values (KMS keys, secrets)
+ * Data Flow:
+ * Client → AppSync (custom query) → Lambda → SSM (config) → AppSync (mutations) → DynamoDB
  */

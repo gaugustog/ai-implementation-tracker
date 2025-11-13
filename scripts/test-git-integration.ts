@@ -33,7 +33,9 @@ async function executeGitOperation(operation: string, data: any): Promise<any> {
   }
 
   // Parse the JSON response
-  return JSON.parse(result.data as string);
+  const parsed = JSON.parse(result.data as string);
+  console.log(`\n📦 Parsed response:`, JSON.stringify(parsed, null, 2));
+  return parsed;
 }
 
 // ============================================================================
