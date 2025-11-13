@@ -1,7 +1,6 @@
 import { defineBackend } from '@aws-amplify/backend';
 import { Key } from 'aws-cdk-lib/aws-kms';
 import { StringParameter } from 'aws-cdk-lib/aws-ssm';
-import { CfnFunction } from 'aws-cdk-lib/aws-lambda';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { storage } from './storage/resource';
@@ -25,18 +24,9 @@ const backend = defineBackend({
 // Grant Lambda permission to invoke AppSync GraphQL API
 // - Creates IAM permissions for Lambda to call AppSync
 // - Grants all necessary DynamoDB permissions via AppSync (no direct DynamoDB access needed)
+// - AppSync endpoint is auto-injected by Amplify when using .handler(a.handler.function(...))
 backend.data.resources.graphqlApi.grantMutation(backend.gitIntegration.resources.lambda);
 backend.data.resources.graphqlApi.grantQuery(backend.gitIntegration.resources.lambda);
-
-// Use L1 CDK construct to inject AppSync endpoint
-// This is the proper way to set environment variables with CDK
-const l1Function = backend.gitIntegration.resources.lambda.node
-  .defaultChild as CfnFunction;
-
-l1Function.addPropertyOverride(
-  'Environment.Variables.APPSYNC_ENDPOINT',
-  backend.data.resources.graphqlApi.graphqlUrl
-);
 
 // ============================================================================
 // KMS ENCRYPTION KEY

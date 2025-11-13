@@ -36,10 +36,14 @@ async function initialize(): Promise<void> {
   console.log('\n');
 
   // Get AppSync endpoint from environment variable
-  const appsyncEndpoint = process.env.APPSYNC_ENDPOINT;
+  // Amplify auto-injects this when using .handler(a.handler.function(...))
+  // Format: API_{API_NAME}_GRAPHQLAPIENDPOINTOUTPUT
+  const appsyncEndpoint =
+    process.env.APPSYNC_ENDPOINT ||
+    process.env.API_SPECFORGEDATAAPI_GRAPHQLAPIENDPOINTOUTPUT;
 
   if (!appsyncEndpoint) {
-    throw new Error('Missing required environment variable: APPSYNC_ENDPOINT');
+    throw new Error('Missing AppSync endpoint. Expected APPSYNC_ENDPOINT or API_SPECFORGEDATAAPI_GRAPHQLAPIENDPOINTOUTPUT');
   }
 
   console.log('AppSync Endpoint:', appsyncEndpoint);
