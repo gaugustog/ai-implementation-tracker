@@ -197,7 +197,8 @@ const schema = a.schema({
 
   // === CUSTOM QUERIES ===
   // Git Integration Lambda invocation
-  gitIntegrationOperation: a
+  // Usage: gitIntegration(operation: "connectRepository", data: { projectId, provider, repoUrl, ... })
+  gitIntegration: a
     .query()
     .arguments({
       operation: a.string().required(),

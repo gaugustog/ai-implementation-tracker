@@ -1,37 +1,26 @@
 import { generateClient } from 'aws-amplify/data';
 import { Amplify } from 'aws-amplify';
-import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 import outputs from '../amplify_outputs.json';
 import type { Schema } from '../amplify/data/resource';
 
 Amplify.configure(outputs);
 const client = generateClient<Schema>();
 
-// Lambda client for direct invocation
-const lambdaClient = new LambdaClient({ region: 'us-east-1' });
-const LAMBDA_FUNCTION_NAME = 'amplify-aiimplementationt-gitintegrationlambdaC102-orJPDEhJRm8j';
-
 /**
- * Invoke Lambda function directly
+ * Execute Git integration operation via GraphQL custom query
  */
-async function invokeLambda(operation: string, data: any): Promise<any> {
-  const payload = {
-    arguments: {
-      operation,
-      data,
-    },
-  };
-
-  const command = new InvokeCommand({
-    FunctionName: LAMBDA_FUNCTION_NAME,
-    Payload: JSON.stringify(payload),
+async function executeGitOperation(operation: string, data: any): Promise<any> {
+  const result = await client.queries.gitIntegration({
+    operation,
+    data: JSON.stringify(data),
   });
 
-  const response = await lambdaClient.send(command);
-  const responsePayload = JSON.parse(new TextDecoder().decode(response.Payload));
+  if (!result.data) {
+    throw new Error('No data returned from gitIntegration query');
+  }
 
-  // Lambda returns JSON string, need to parse it
-  return JSON.parse(responsePayload);
+  // Parse the JSON response
+  return JSON.parse(result.data as string);
 }
 
 // ============================================================================
@@ -116,9 +105,9 @@ async function testGitIntegration(config: TestConfig) {
 
     logStep(2, 'Connect Git Repository');
 
-    console.log('Invoking connectRepository operation via Lambda...');
+    console.log('Invoking connectRepository operation via GraphQL...');
 
-    const connectResponse = await invokeLambda('connectRepository', {
+    const connectResponse = await executeGitOperation('connectRepository', {
       projectId,
       provider: config.provider,
       repoUrl: config.repoUrl,
@@ -161,7 +150,7 @@ async function testGitIntegration(config: TestConfig) {
 
     logStep(4, 'List Branches');
 
-    const branchesResponse = await invokeLambda('listBranches', { repositoryId });
+    const branchesResponse = await executeGitOperation('listBranches', { repositoryId });
 
     if (!branchesResponse.success) {
       throw new Error(`List branches failed: ${branchesResponse.error?.message}`);
@@ -191,7 +180,7 @@ async function testGitIntegration(config: TestConfig) {
       if (targetBranch) {
         console.log(`Switching from '${branchesResponse.data.currentBranch}' to '${targetBranch}'...`);
 
-        const switchResponse = await invokeLambda('switchBranch', {
+        const switchResponse = await executeGitOperation('switchBranch', {
           repositoryId,
           branch: targetBranch,
         });
@@ -214,7 +203,7 @@ async function testGitIntegration(config: TestConfig) {
 
     logStep(6, 'Validate Repository Access');
 
-    const validateResponse = await invokeLambda('validateAccess', { repositoryId });
+    const validateResponse = await executeGitOperation('validateAccess', { repositoryId });
 
     logSuccess('Access validation completed');
     logInfo('Has Access', validateResponse.data?.hasAccess ?? validateResponse.success);
