@@ -1,6 +1,5 @@
-import { generateClient } from 'aws-amplify/data';
-import type { Schema } from '../../data/resource';
 import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
+import { AppSyncClient } from './lib/appsync-client';
 import { KMSEncryption } from './lib/kms-encryption';
 import { GitProviderFactory } from './lib/git-providers/factory';
 import type {
@@ -13,21 +12,19 @@ import type {
   ValidateAccessData,
 } from './lib/types';
 
-// Generate Amplify Data client (uses auto-injected AppSync config)
-const client = generateClient<Schema>();
-
 // SSM client for parameter retrieval
 const ssmClient = new SSMClient({});
 
-// Singleton instance for KMS (reused across warm Lambda invocations)
+// Singleton instances (reused across warm Lambda invocations)
+let appsyncClient: AppSyncClient | null = null;
 let kmsEncryption: KMSEncryption | null = null;
 
 /**
  * Initialize Lambda dependencies
  */
 async function initialize(): Promise<void> {
-  if (kmsEncryption) {
-    console.log('Using cached KMS client');
+  if (appsyncClient && kmsEncryption) {
+    console.log('Using cached clients');
     return;
   }
 
@@ -37,6 +34,15 @@ async function initialize(): Promise<void> {
   console.log('\n📋 Environment Variables:');
   console.log(JSON.stringify(process.env, null, 2));
   console.log('\n');
+
+  // Get AppSync endpoint from environment variable
+  const appsyncEndpoint = process.env.APPSYNC_ENDPOINT;
+
+  if (!appsyncEndpoint) {
+    throw new Error('Missing required environment variable: APPSYNC_ENDPOINT');
+  }
+
+  console.log('AppSync Endpoint:', appsyncEndpoint);
 
   // Get KMS key ID from SSM Parameter Store
   console.log('Retrieving KMS key ID from SSM...');
@@ -53,6 +59,8 @@ async function initialize(): Promise<void> {
 
   console.log('KMS Key ID retrieved from SSM:', kmsKeyId);
 
+  // Initialize clients
+  appsyncClient = new AppSyncClient(appsyncEndpoint);
   kmsEncryption = new KMSEncryption(kmsKeyId);
 
   console.log('✅ Lambda initialized successfully');
@@ -146,7 +154,7 @@ async function connectRepository(data: ConnectRepositoryData): Promise<GitIntegr
 
   // Create GitRepository record
   console.log('\n📝 Creating GitRepository record...');
-  const repoResult = await client.models.GitRepository.create({
+  const repository = await appsyncClient!.createGitRepository({
     projectId: data.projectId,
     provider: data.provider,
     repoUrl: data.repoUrl,
@@ -154,16 +162,11 @@ async function connectRepository(data: ConnectRepositoryData): Promise<GitIntegr
     status: 'pending',
   });
 
-  if (!repoResult.data) {
-    throw new Error('Failed to create GitRepository');
-  }
-
-  const repository = repoResult.data;
   console.log('✅ GitRepository created:', repository.id);
 
   // Create GitCredential record
   console.log('\n🔑 Creating GitCredential record...');
-  await client.models.GitCredential.create({
+  await appsyncClient!.createGitCredential({
     repositoryId: repository.id,
     type: data.credentialType,
     encryptedToken,
@@ -187,7 +190,7 @@ async function connectRepository(data: ConnectRepositoryData): Promise<GitIntegr
 
     // Update repository with branch info
     console.log('\n📝 Updating repository with branch info...');
-    await client.models.GitRepository.update({
+    await appsyncClient!.updateGitRepository({
       id: repository.id,
       currentBranch: defaultBranch,
       branches: JSON.stringify(branches.slice(0, 100)), // Cache first 100 branches as JSON string
@@ -208,7 +211,7 @@ async function connectRepository(data: ConnectRepositoryData): Promise<GitIntegr
     console.error('\n❌ Connection test failed:', error);
 
     // Update status to error
-    await client.models.GitRepository.update({
+    await appsyncClient!.updateGitRepository({
       id: repository.id,
       status: 'error',
     });
@@ -225,38 +228,20 @@ async function listBranches(data: ListBranchesData): Promise<GitIntegrationRespo
   console.log('Repository ID:', data.repositoryId);
 
   // Get repository
-  const repoResult = await client.models.GitRepository.get({ id: data.repositoryId });
-  if (!repoResult.data) {
-    throw new Error(`Repository not found: ${data.repositoryId}`);
-  }
-  const repository = repoResult.data;
+  const repository = await appsyncClient!.getGitRepository(data.repositoryId);
   console.log('Repository URL:', repository.repoUrl);
   console.log('Provider:', repository.provider);
 
   // Get credentials
-  const credResult = await client.models.GitCredential.list({
-    filter: { repositoryId: { eq: data.repositoryId } },
-  });
-  const credentials = credResult.data || [];
-  if (credentials.length === 0) {
-    throw new Error(`No credential found for repository: ${data.repositoryId}`);
-  }
-  const credential = credentials[0];
-
-  if (!credential.encryptedToken) {
-    throw new Error('Credential has no encrypted token');
-  }
+  const credential = await appsyncClient!.getGitCredential(data.repositoryId);
   const decryptedToken = await kmsEncryption!.decrypt(credential.encryptedToken);
 
   // Get branches from provider
-  if (!repository.provider) {
-    throw new Error('Repository has no provider configured');
-  }
   const gitProvider = GitProviderFactory.create(repository.provider);
   const branches = await gitProvider.listBranches(repository.repoUrl, decryptedToken);
 
   // Update cached branches
-  await client.models.GitRepository.update({
+  await appsyncClient!.updateGitRepository({
     id: data.repositoryId,
     branches: JSON.stringify(branches.slice(0, 100)), // Cache as JSON string
     lastSyncedAt: new Date().toISOString(),
@@ -281,31 +266,13 @@ async function switchBranch(data: SwitchBranchData): Promise<GitIntegrationRespo
   console.log('Target branch:', data.branch);
 
   // Get repository
-  const repoResult = await client.models.GitRepository.get({ id: data.repositoryId });
-  if (!repoResult.data) {
-    throw new Error(`Repository not found: ${data.repositoryId}`);
-  }
-  const repository = repoResult.data;
+  const repository = await appsyncClient!.getGitRepository(data.repositoryId);
 
   // Get credentials
-  const credResult = await client.models.GitCredential.list({
-    filter: { repositoryId: { eq: data.repositoryId } },
-  });
-  const credentials = credResult.data || [];
-  if (credentials.length === 0) {
-    throw new Error(`No credential found for repository: ${data.repositoryId}`);
-  }
-  const credential = credentials[0];
-
-  if (!credential.encryptedToken) {
-    throw new Error('Credential has no encrypted token');
-  }
+  const credential = await appsyncClient!.getGitCredential(data.repositoryId);
   const decryptedToken = await kmsEncryption!.decrypt(credential.encryptedToken);
 
   // Verify branch exists
-  if (!repository.provider) {
-    throw new Error('Repository has no provider configured');
-  }
   const gitProvider = GitProviderFactory.create(repository.provider);
   const branchExists = await gitProvider.branchExists(
     repository.repoUrl,
@@ -318,7 +285,7 @@ async function switchBranch(data: SwitchBranchData): Promise<GitIntegrationRespo
   }
 
   // Update current branch
-  await client.models.GitRepository.update({
+  await appsyncClient!.updateGitRepository({
     id: data.repositoryId,
     currentBranch: data.branch,
   });
@@ -341,22 +308,12 @@ async function updateCredential(data: UpdateCredentialData): Promise<GitIntegrat
   console.log('\n🔑 Updating credentials...');
   console.log('Repository ID:', data.repositoryId);
 
-  // Get existing credential to get its ID
-  const credResult = await client.models.GitCredential.list({
-    filter: { repositoryId: { eq: data.repositoryId } },
-  });
-  const credentials = credResult.data || [];
-  if (credentials.length === 0) {
-    throw new Error(`No credential found for repository: ${data.repositoryId}`);
-  }
-  const credential = credentials[0];
-
   // Encrypt new token
   const encryptedToken = await kmsEncryption!.encrypt(data.token);
 
   // Update credential
-  await client.models.GitCredential.update({
-    id: credential.id,
+  await appsyncClient!.updateGitCredential({
+    repositoryId: data.repositoryId,
     encryptedToken,
     username: data.username,
   });
@@ -379,32 +336,12 @@ async function validateAccess(data: ValidateAccessData): Promise<GitIntegrationR
   console.log('\n🔐 Validating access...');
   console.log('Repository ID:', data.repositoryId);
 
-  // Get repository
-  const repoResult = await client.models.GitRepository.get({ id: data.repositoryId });
-  if (!repoResult.data) {
-    throw new Error(`Repository not found: ${data.repositoryId}`);
-  }
-  const repository = repoResult.data;
-
-  // Get credentials
-  const credResult = await client.models.GitCredential.list({
-    filter: { repositoryId: { eq: data.repositoryId } },
-  });
-  const credentials = credResult.data || [];
-  if (credentials.length === 0) {
-    throw new Error(`No credential found for repository: ${data.repositoryId}`);
-  }
-  const credential = credentials[0];
-
-  if (!credential.encryptedToken) {
-    throw new Error('Credential has no encrypted token');
-  }
+  // Get repository and credentials
+  const repository = await appsyncClient!.getGitRepository(data.repositoryId);
+  const credential = await appsyncClient!.getGitCredential(data.repositoryId);
   const decryptedToken = await kmsEncryption!.decrypt(credential.encryptedToken);
 
   // Test access
-  if (!repository.provider) {
-    throw new Error('Repository has no provider configured');
-  }
   const gitProvider = GitProviderFactory.create(repository.provider);
 
   try {

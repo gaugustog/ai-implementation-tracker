@@ -1,7 +1,7 @@
 import { defineBackend } from '@aws-amplify/backend';
 import { Key } from 'aws-cdk-lib/aws-kms';
 import { StringParameter } from 'aws-cdk-lib/aws-ssm';
-import { Function } from 'aws-cdk-lib/aws-lambda';
+import { CfnFunction } from 'aws-cdk-lib/aws-lambda';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { storage } from './storage/resource';
@@ -28,25 +28,15 @@ const backend = defineBackend({
 backend.data.resources.graphqlApi.grantMutation(backend.gitIntegration.resources.lambda);
 backend.data.resources.graphqlApi.grantQuery(backend.gitIntegration.resources.lambda);
 
+// Use L1 CDK construct to inject AppSync endpoint
+// This is the proper way to set environment variables with CDK
+const l1Function = backend.gitIntegration.resources.lambda.node
+  .defaultChild as CfnFunction;
 
-// Get the underlying Lambda Function construct to add environment variables
-const lambdaFunction = backend.gitIntegration.resources.lambda as Function;
-// const graphqlApi = backend.data.resources.graphqlApi;
-
-// Inject AppSync API ID and endpoint URL
-// Cast to any to access underlying CDK resource properties
-// const graphqlApiAny = graphqlApi as any;
-// const apiId = graphqlApiAny.apiId || graphqlApiAny.attrApiId;
-
-// Get the actual GraphQL URL from the AppSync API resource
-// The URL uses a different ID than the API ID, so we need to get it from attrGraphQlUrl
-// If not available, construct it (though this may not work correctly)
-// const graphqlUrl = graphqlApiAny.attrGraphQlUrl ||
-//                    graphqlApiAny.graphqlUrl ||
-//                    `https://4th73qzmiret5mp6xsnbb3oe3e.appsync-api.us-east-1.amazonaws.com/graphql`;
-
-// lambdaFunction.addEnvironment('APPSYNC_ENDPOINT', graphqlUrl);
-// lambdaFunction.addEnvironment('APPSYNC_API_ID', apiId);
+l1Function.addPropertyOverride(
+  'Environment.Variables.APPSYNC_ENDPOINT',
+  backend.data.resources.graphqlApi.graphqlUrl
+);
 
 // ============================================================================
 // KMS ENCRYPTION KEY

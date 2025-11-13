@@ -7,5 +7,6 @@ export const gitIntegration = defineFunction({
   memoryMB: 512,
   environment: {
     NODE_ENV: 'production',
+    APPSYNC_ENDPOINT: 'placeholder', // Will be overridden by backend.ts
   },
 });
