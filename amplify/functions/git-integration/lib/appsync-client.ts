@@ -136,7 +136,12 @@ export class AppSyncClient {
 
   async getGitCredential(repositoryId: string): Promise<GitCredential> {
     const data = await this.execute(GET_GIT_CREDENTIAL, { repositoryId });
-    return data.getGitCredential;
+    // Query uses listGitCredentials, so get first item
+    const items = data.listGitCredentials?.items || [];
+    if (items.length === 0) {
+      throw new Error(`No credential found for repository: ${repositoryId}`);
+    }
+    return items[0];
   }
 
   async updateGitCredential(input: AppSyncUpdateGitCredentialInput): Promise<GitCredential> {
