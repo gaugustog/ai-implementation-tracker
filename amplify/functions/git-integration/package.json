@@ -10,6 +10,10 @@
   },
   "dependencies": {
     "@aws-sdk/client-kms": "^3.0.0",
+    "@aws-sdk/signature-v4": "^3.0.0",
+    "@aws-sdk/protocol-http": "^3.0.0",
+    "@aws-sdk/credential-provider-node": "^3.0.0",
+    "@smithy/hash-node": "^3.0.0",
     "@octokit/rest": "^20.0.0",
     "aws-amplify": "^6.0.0"
   },

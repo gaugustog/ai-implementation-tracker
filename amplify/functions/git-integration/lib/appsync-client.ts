@@ -20,35 +20,75 @@ import {
   UPDATE_GIT_CREDENTIAL,
 } from '../graphql/mutations';
 
+// AWS SDK imports for IAM authentication
+import { SignatureV4 } from '@aws-sdk/signature-v4';
+import { HttpRequest } from '@aws-sdk/protocol-http';
+import { defaultProvider } from '@aws-sdk/credential-provider-node';
+import { Hash } from '@smithy/hash-node';
+
 export class AppSyncClient {
   private apiEndpoint: string;
+  private region: string;
+  private signer: SignatureV4;
 
   constructor(apiEndpoint: string) {
     this.apiEndpoint = apiEndpoint;
+
+    // Extract region from AppSync endpoint
+    // Format: https://{api-id}.appsync-api.{region}.amazonaws.com/graphql
+    const match = apiEndpoint.match(/\.appsync-api\.([^.]+)\.amazonaws\.com/);
+    this.region = match ? match[1] : 'us-east-1';
+
+    // Initialize AWS Signature V4 signer
+    this.signer = new SignatureV4({
+      service: 'appsync',
+      region: this.region,
+      credentials: defaultProvider(),
+      sha256: Hash.bind(null, 'sha256'),
+    });
   }
 
   /**
-   * Execute GraphQL query/mutation
+   * Execute GraphQL query/mutation with AWS IAM authentication
    */
   private async execute(query: string, variables: any): Promise<any> {
     try {
       console.log('Executing GraphQL operation...');
       console.log('Variables:', JSON.stringify(variables, null, 2));
 
-      const response = await fetch(this.apiEndpoint, {
+      // Prepare request body
+      const body = JSON.stringify({ query, variables });
+
+      // Parse endpoint URL
+      const url = new URL(this.apiEndpoint);
+
+      // Create HTTP request for signing
+      const httpRequest = new HttpRequest({
         method: 'POST',
+        protocol: url.protocol,
+        hostname: url.hostname,
+        path: url.pathname,
         headers: {
           'Content-Type': 'application/json',
-          // IAM authentication handled automatically by Lambda execution role
+          host: url.hostname,
         },
-        body: JSON.stringify({
-          query,
-          variables,
-        }),
+        body,
+      });
+
+      // Sign the request with AWS Signature V4
+      console.log('Signing request with AWS IAM credentials...');
+      const signedRequest = await this.signer.sign(httpRequest);
+
+      // Execute signed request
+      const response = await fetch(this.apiEndpoint, {
+        method: signedRequest.method,
+        headers: signedRequest.headers as Record<string, string>,
+        body: signedRequest.body,
       });
 
       if (!response.ok) {
-        throw new Error(`GraphQL request failed: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`GraphQL request failed: ${response.status} ${response.statusText}. ${errorText}`);
       }
 
       const result = await response.json() as any;
