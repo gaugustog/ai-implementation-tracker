@@ -33,6 +33,11 @@ async function initialize(): Promise<void> {
 
   console.log('Initializing Lambda...');
 
+  // Log all environment variables for debugging
+  console.log('\n📋 Environment Variables:');
+  console.log(JSON.stringify(process.env, null, 2));
+  console.log('\n');
+
   // Get KMS key ID from SSM Parameter Store
   console.log('Retrieving KMS key ID from SSM...');
   const command = new GetParameterCommand({
