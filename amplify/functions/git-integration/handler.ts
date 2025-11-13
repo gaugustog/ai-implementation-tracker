@@ -26,12 +26,12 @@ async function initialize(): Promise<void> {
 
   console.log('Initializing Lambda...');
 
-  // Get environment variables (auto-injected by Amplify)
-  const appsyncEndpoint = process.env.API_SPECFORGEDATAAPI_GRAPHQLAPIENDPOINTOUTPUT;
+  // Get environment variables (injected by backend.ts)
+  const appsyncEndpoint = process.env.APPSYNC_ENDPOINT;
   const kmsKeyId = process.env.KMS_KEY_ID;
 
   if (!appsyncEndpoint) {
-    throw new Error('Missing required environment variable: API_SPECFORGEDATAAPI_GRAPHQLAPIENDPOINTOUTPUT');
+    throw new Error('Missing required environment variable: APPSYNC_ENDPOINT');
   }
 
   if (!kmsKeyId) {
