@@ -50,7 +50,7 @@ async function initialize(): Promise<void> {
 /**
  * Main Lambda handler
  */
-export const handler = async (event: GitIntegrationEvent): Promise<GitIntegrationResponse> => {
+export const handler = async (event: GitIntegrationEvent): Promise<any> => {
   console.log('='.repeat(80));
   console.log('Git Integration Lambda invoked');
   console.log('Event:', JSON.stringify(event, null, 2));
@@ -62,35 +62,47 @@ export const handler = async (event: GitIntegrationEvent): Promise<GitIntegratio
 
     const { operation, data } = event.arguments;
 
+    // Parse data if it's a JSON string (when called from AppSync custom query)
+    const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+
     console.log(`\n📋 Operation: ${operation}`);
 
     // Route to appropriate operation handler
+    let result: GitIntegrationResponse;
     switch (operation) {
       case 'connectRepository':
-        return await connectRepository(data as ConnectRepositoryData);
+        result = await connectRepository(parsedData as ConnectRepositoryData);
+        break;
 
       case 'listBranches':
-        return await listBranches(data as ListBranchesData);
+        result = await listBranches(parsedData as ListBranchesData);
+        break;
 
       case 'switchBranch':
-        return await switchBranch(data as SwitchBranchData);
+        result = await switchBranch(parsedData as SwitchBranchData);
+        break;
 
       case 'updateCredential':
-        return await updateCredential(data as UpdateCredentialData);
+        result = await updateCredential(parsedData as UpdateCredentialData);
+        break;
 
       case 'validateAccess':
-        return await validateAccess(data as ValidateAccessData);
+        result = await validateAccess(parsedData as ValidateAccessData);
+        break;
 
       default:
         throw new Error(`Unknown operation: ${operation}`);
     }
+
+    // Return as JSON string for AppSync custom query (schema expects a.json())
+    return JSON.stringify(result);
   } catch (error: any) {
     console.error('='.repeat(80));
     console.error('❌ Error in git-integration Lambda:');
     console.error(error);
     console.error('='.repeat(80));
 
-    return {
+    const errorResponse = {
       success: false,
       error: {
         message: error.message || 'Unknown error occurred',
@@ -98,6 +110,9 @@ export const handler = async (event: GitIntegrationEvent): Promise<GitIntegratio
         details: error.stack,
       },
     };
+
+    // Return error as JSON string for AppSync custom query
+    return JSON.stringify(errorResponse);
   }
 };
 
@@ -159,7 +174,7 @@ async function connectRepository(data: ConnectRepositoryData): Promise<GitIntegr
     await appsyncClient!.updateGitRepository({
       id: repository.id,
       currentBranch: defaultBranch,
-      branches: branches.slice(0, 100), // Cache first 100 branches
+      branches: JSON.stringify(branches.slice(0, 100)), // Cache first 100 branches as JSON string
       status: 'ready',
       lastSyncedAt: new Date().toISOString(),
     });
@@ -209,7 +224,7 @@ async function listBranches(data: ListBranchesData): Promise<GitIntegrationRespo
   // Update cached branches
   await appsyncClient!.updateGitRepository({
     id: data.repositoryId,
-    branches: branches.slice(0, 100),
+    branches: JSON.stringify(branches.slice(0, 100)), // Cache as JSON string
     lastSyncedAt: new Date().toISOString(),
   });
 

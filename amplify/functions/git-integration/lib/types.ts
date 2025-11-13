@@ -56,7 +56,7 @@ export interface GitRepository {
   provider: GitProvider;
   repoUrl: string;
   currentBranch: string;
-  branches?: string[];
+  branches?: string; // JSON string (schema type is a.json())
   status: 'pending' | 'analyzing' | 'ready' | 'error';
 }
 
@@ -110,14 +110,14 @@ export interface AppSyncCreateGitRepositoryInput {
   repoUrl: string;
   currentBranch: string;
   status: 'pending' | 'analyzing' | 'ready' | 'error';
-  branches?: string[];
+  branches?: string; // JSON string (schema type is a.json())
   lastSyncedAt?: string;
 }
 
 export interface AppSyncUpdateGitRepositoryInput {
   id: string;
   currentBranch?: string;
-  branches?: string[];
+  branches?: string; // JSON string (schema type is a.json())
   status?: 'pending' | 'analyzing' | 'ready' | 'error';
   lastSyncedAt?: string;
 }
