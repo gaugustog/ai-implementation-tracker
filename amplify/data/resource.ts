@@ -1,4 +1,5 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
+import { gitIntegration } from '../functions/git-integration/resource';
 
 const schema = a.schema({
   // === PROJECTS ===
@@ -205,7 +206,7 @@ const schema = a.schema({
       data: a.json().required(),
     })
     .returns(a.json())
-    .handler(a.handler.function('gitIntegration'))
+    .handler(a.handler.function(gitIntegration))
     .authorization(allow => [allow.publicApiKey()]),
 });
 
